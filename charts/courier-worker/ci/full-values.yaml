@@ -1,0 +1,19 @@
+application:
+  deployment:
+    container:
+      image:
+        tag: "v2026.08.1-release-e1f4018"
+  secrets:
+    - name: REDIS_PASSWORD
+      secretName: redis-local-credentials
+      key: password
+    - name: SMTP_PASSWORD
+      secretName: gmail-smtp-credentials
+      key: password
+    - name: TELEGRAM_BOT_TOKEN
+      secretName: telegram-credentials
+      key: bot-token
+  config:
+    data:
+      REDIS_HOST: redis.infrastructure.svc.cluster.local
+      SMTP_HOST: smtp.gmail.com

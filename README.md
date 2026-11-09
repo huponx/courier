@@ -216,16 +216,54 @@ Commands use the [GitHub CLI](https://cli.github.com) (`gh auth login` first, wi
    gh api "/user/packages?package_type=container" --jq '.[].name'   # list the packages (use /orgs/<org>/packages for an org)
    ```
 
-6. **Branch protection**: require the `pr` workflow checks on `main`, and keep `release*` pushes to maintainers (a push to `release*` creates a staging pre-release):
+6. **Branch ruleset** for `main` (PR required, squash only, required checks of the `pr` flow, no force push or deletion). Merge the workflows to `main` first, while `main` is unprotected: status checks only show up in the ruleset picker after they have run once. Save as `main-ruleset.json` and apply (the file is only an input, do not commit it):
 
-   ```bash
-   gh api -X PUT repos/huponx/courier/branches/main/protection --input - <<'JSON'
-   {"required_status_checks":{"strict":true,"contexts":["pr / contract","pr / lint-test","pr / build (courier)","pr / build (courier-worker)"]},
-    "enforce_admins":false,"required_pull_request_reviews":{"required_approving_review_count":1},"restrictions":null}
-   JSON
+   ```json
+   {
+     "name": "protect main",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+     "rules": [
+       { "type": "deletion" },
+       { "type": "non_fast_forward" },
+       { "type": "pull_request", "parameters": {
+           "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false,
+           "require_code_owner_review": false, "require_last_push_approval": false,
+           "required_review_thread_resolution": false,
+           "allowed_merge_methods": ["squash"] } },
+       { "type": "required_status_checks", "parameters": {
+           "strict_required_status_checks_policy": true,
+           "required_status_checks": [
+             { "context": "pr / contract" },
+             { "context": "pr / lint-test" },
+             { "context": "pr / build / build (courier)" },
+             { "context": "pr / build / build (courier-worker)" } ] } }
+     ],
+     "bypass_actors": []
+   }
    ```
 
-   Check the exact context names in a first PR run (`gh pr checks`) and adjust.
+   ```bash
+   REPO=huponx/courier
+   gh api repos/$REPO/rulesets --method POST --input main-ruleset.json
+   gh api repos/$REPO/rulesets --jq '.[] | {id, name, enforcement}'   # verify
+   ```
+
+   Or in the UI: Settings > Rules > Rulesets > New ruleset > Import a ruleset. The check names are `<caller job> / <reusable job>`; confirm them with `gh pr checks <pr>` after the first PR run. To change it later: `gh api repos/$REPO/rulesets/<id> --method PUT --input main-ruleset.json`. Rulesets on a private repo need a paid GitHub plan.
+
+   Optional second ruleset for `release*` (a push there creates a staging pre-release, so no force push and no deletion). Save as `release-ruleset.json` and apply the same way:
+
+   ```json
+   {
+     "name": "protect release branches",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": { "ref_name": { "include": ["refs/heads/release*"], "exclude": [] } },
+     "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ],
+     "bypass_actors": []
+   }
+   ```
 
 7. **`mm-deploy`**:
 

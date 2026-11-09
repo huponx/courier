@@ -1,0 +1,18 @@
+application:
+  deployment:
+    replicas: 2
+    container:
+      image:
+        tag: "v2026.08.1-release-e1f4018"
+  ingress:
+    enabled: false
+  secrets:
+    - name: COURIER_S2S_TOKEN
+      secretName: courier-s2s
+      key: token
+    - name: REDIS_PASSWORD
+      secretName: redis-local-credentials
+      key: password
+  config:
+    data:
+      REDIS_HOST: redis.infrastructure.svc.cluster.local

@@ -1,0 +1,47 @@
+# Values of the go-application chart live under `application:` (alias of the dependency).
+# image.tag is written at release time (update-deployment-values); the default only keeps `helm template` working.
+application:
+  deployment:
+    container:
+      image:
+        repository: huponx/courier
+        tag: "0.0.0"
+      port: 9090
+      # config.data below becomes the ConfigMap <name>-env-vars, loaded as environment variables.
+      envFrom:
+        - configMapRef:
+            name: '{{ include "common.name" . }}-env-vars'
+      startupProbe:
+        tcpSocket:
+          port: 9090
+        failureThreshold: 30
+        periodSeconds: 2
+      livenessProbe:
+        tcpSocket:
+          port: 9090
+        periodSeconds: 20
+      readinessProbe:
+        tcpSocket:
+          port: 9090
+        periodSeconds: 10
+      resources:
+        limits:
+          cpu: 200m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+  service:
+    enabled: true
+    port: 9090
+  config:
+    data:
+      HOST: "0.0.0.0"
+      PORT: "9090"
+      LOG_ENCODING: json
+  # Secret values stay out of git: reference existing Secrets (mm-deploy overrides this list).
+  secrets: []
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
