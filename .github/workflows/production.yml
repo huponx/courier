@@ -1,0 +1,16 @@
+name: Production
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  production:
+    uses: huponx/actions/.github/workflows/service-production.yml@v1
+    with:
+      deploy-app-id: ${{ vars.DEPLOY_APP_ID }}
+    secrets: inherit

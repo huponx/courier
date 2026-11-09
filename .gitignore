@@ -1,0 +1,19 @@
+/bin/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# helm dependencies (helm dependency build)
+charts/*/charts/
+charts/*/*.tgz

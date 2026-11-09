@@ -1,0 +1,47 @@
+apps:
+  - name: courier
+    language: go
+    cicd:
+      jobs:
+        containerize-and-package:
+          image-name: courier
+          dockerfile-path: build/courier/Dockerfile
+          chart-path: charts/courier
+          image-tag-paths:
+            - .application.deployment.container.image.tag
+          trivy:
+            severity: "HIGH,CRITICAL"
+            ignore-unfixed: true
+            exit-code: 1
+  - name: courier-worker
+    language: go
+    cicd:
+      jobs:
+        containerize-and-package:
+          image-name: courier-worker
+          dockerfile-path: build/courier-worker/Dockerfile
+          chart-path: charts/courier-worker
+          image-tag-paths:
+            - .application.deployment.container.image.tag
+          trivy:
+            severity: "HIGH,CRITICAL"
+            ignore-unfixed: true
+            exit-code: 1
+global:
+  deploy:
+    repo: huponx/mm-deploy
+    base-branch: main
+    file: "applications/{env}/{app}.yaml"
+    set:
+      - .spec.source.targetRevision
+  environments:
+    dev:
+      workflows: [main]
+      automerge: true
+      labels: [automerge]
+    staging:
+      workflows: [staging]
+      enabled: false
+    production:
+      workflows: [production]
+      enabled: false

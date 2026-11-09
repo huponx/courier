@@ -1,0 +1,20 @@
+name: Staging
+
+on:
+  push:
+    branches: ["release*"]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    uses: huponx/actions/.github/workflows/service-staging.yml@v1
+    with:
+      deploy-app-id: ${{ vars.DEPLOY_APP_ID }}
+    secrets: inherit
