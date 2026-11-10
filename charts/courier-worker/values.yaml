@@ -1,0 +1,49 @@
+# Values of the go-application chart live under `application:` (alias of the dependency).
+# image.tag is written at release time (update-deployment-values); the default only keeps `helm template` working.
+application:
+  deployment:
+    container:
+      image:
+        repository: huponx/courier-worker
+        tag: "0.0.0"
+      # Probes only: the worker exposes /healthz and /readyz, no gRPC.
+      port: 8081
+      # config.data below becomes the ConfigMap <name>-env-vars, loaded as environment variables.
+      envFrom:
+        - configMapRef:
+            name: '{{ include "common.name" . }}-env-vars'
+      startupProbe:
+        httpGet:
+          path: /healthz
+          port: 8081
+        failureThreshold: 30
+        periodSeconds: 2
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8081
+        periodSeconds: 20
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: 8081
+        periodSeconds: 10
+      resources:
+        limits:
+          cpu: 300m
+          memory: 192Mi
+        requests:
+          cpu: 50m
+          memory: 96Mi
+  service:
+    enabled: false
+  config:
+    data:
+      HEALTH_ADDR: ":8081"
+      LOG_ENCODING: json
+  # Secret values stay out of git: reference existing Secrets (mm-deploy overrides this list).
+  secrets: []
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false

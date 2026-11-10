@@ -1,0 +1,6 @@
+dependencies:
+- name: go-application
+  repository: oci://ghcr.io/huponx/charts
+  version: 1.0.0
+digest: sha256:2aff35952e9aa8759455409152210da49014c578a74dd515235b978aa81dc862
+generated: "2026-11-09T16:57:39.199547+07:00"

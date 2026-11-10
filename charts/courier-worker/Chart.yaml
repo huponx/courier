@@ -1,0 +1,12 @@
+apiVersion: v2
+name: courier-worker
+description: Courier worker (consumes Redis Streams, sends email and Telegram), deployed with the go-application chart.
+type: application
+# Replaced at release time (update-chart-metadata): version and appVersion carry the release version.
+version: 0.0.0
+appVersion: "0.0.0"
+dependencies:
+  - name: go-application
+    version: 1.0.0
+    repository: oci://ghcr.io/huponx/charts
+    alias: application
