@@ -1,0 +1,5 @@
+# Trivy ignore list (read from the repository root by every Trivy scan of the CI).
+
+# DS-0026 (LOW) "Add HEALTHCHECK instruction": the images run on Kubernetes, which ignores the Dockerfile
+# HEALTHCHECK and uses the probes of the charts (charts/*/values.yaml). The distroless base has no shell or curl.
+DS-0026
