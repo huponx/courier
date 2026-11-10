@@ -10,7 +10,7 @@ apps:
           image-tag-paths:
             - .application.deployment.container.image.tag
           trivy:
-            severity: "HIGH,CRITICAL"
+            severity: "LOW,MEDIUM,HIGH,CRITICAL"
             ignore-unfixed: true
             exit-code: 0   # report only: the CVEs are listed in the PR comment, the build does not fail
   - name: courier-worker
@@ -24,7 +24,7 @@ apps:
           image-tag-paths:
             - .application.deployment.container.image.tag
           trivy:
-            severity: "HIGH,CRITICAL"
+            severity: "LOW,MEDIUM,HIGH,CRITICAL"
             ignore-unfixed: true
             exit-code: 0   # report only: the CVEs are listed in the PR comment, the build does not fail
 global:
