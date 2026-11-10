@@ -252,7 +252,7 @@ Commands use the [GitHub CLI](https://cli.github.com) (`gh auth login` first, wi
 
    Or in the UI: Settings > Rules > Rulesets > New ruleset > Import a ruleset. The check names are `<caller job> / <reusable job>`; confirm them with `gh pr checks <pr>` after the first PR run. To change it later: `gh api repos/$REPO/rulesets/<id> --method PUT --input main-ruleset.json`. Rulesets on a private repo need a paid GitHub plan.
 
-   Optional second ruleset for `release*` (a push there creates a staging pre-release, so no force push and no deletion). Save as `release-ruleset.json` and apply the same way:
+   Second ruleset for `release*`: a merge into it creates a staging pre-release, so it needs a PR with the same checks as `main` (the `pr` flow also runs on PRs into `release*`), and no force push or deletion. Save as `release-ruleset.json` and apply the same way (`gh api repos/$REPO/rulesets --method POST --input release-ruleset.json`):
 
    ```json
    {
@@ -260,10 +260,27 @@ Commands use the [GitHub CLI](https://cli.github.com) (`gh auth login` first, wi
      "target": "branch",
      "enforcement": "active",
      "conditions": { "ref_name": { "include": ["refs/heads/release*"], "exclude": [] } },
-     "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ],
+     "rules": [
+       { "type": "deletion" },
+       { "type": "non_fast_forward" },
+       { "type": "pull_request", "parameters": {
+           "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false,
+           "require_code_owner_review": false, "require_last_push_approval": false,
+           "required_review_thread_resolution": false,
+           "allowed_merge_methods": ["merge", "squash"] } },
+       { "type": "required_status_checks", "parameters": {
+           "strict_required_status_checks_policy": false,
+           "required_status_checks": [
+             { "context": "pr / contract" },
+             { "context": "pr / lint-test" },
+             { "context": "pr / build / build (courier)" },
+             { "context": "pr / build / build (courier-worker)" } ] } }
+     ],
      "bypass_actors": []
    }
    ```
+
+   To update the existing ruleset: `gh api repos/$REPO/rulesets --jq '.[] | {id, name}'`, then `gh api repos/$REPO/rulesets/<id> --method PUT --input release-ruleset.json`. The ruleset applies to every `release*` branch, so create the first one (for example `release`) from `main` before applying it, or push it while the ruleset is not yet active.
 
 7. **`mm-deploy`**:
 
