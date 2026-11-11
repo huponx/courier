@@ -89,10 +89,12 @@ All settings are environment variables (see `.env.example`).
 | `HOST` / `PORT` | `0.0.0.0` / `9090` | gRPC listen (courier) |
 | `SHUTDOWN_TIMEOUT` | `15s` | Graceful drain |
 | `LOG_LEVEL` / `LOG_ENCODING` | `info` / `console` | |
-| `SERVICE_NAME` / `ENV` | `app` / `dev` | `ENV=dev` → optional S2S; any other `ENV` requires `COURIER_S2S_TOKEN` or the process panics |
+| `SERVICE_NAME` / `ENV` | `app` / `dev` | Only `ENV=local` has optional gRPC auth. Any other value (`dev`, `staging`, `production`, empty, a typo) requires ServiceAccount tokens, see [Service-to-service auth](#service-to-service-auth) |
 | `DEFAULT_LOCALE` | `en` | Template fallback |
 | `REDIS_HOST` / `PORT` / `PASSWORD` / `DB` | `localhost` / `6379` / empty / `0` | |
-| `COURIER_S2S_TOKEN` | empty | Receiver S2S secret. Inject from a Kubernetes Secret (`secretKeyRef`), never a ConfigMap. Leave empty only for local `ENV=dev`. |
+| `COURIER_AUTH_AUDIENCE` | `courier` | Audience the callers' ServiceAccount tokens must have (any `ENV` except `local`); the process panics at start if it is blank |
+| `COURIER_AUTH_ALLOWED` | empty | Accepted callers, comma separated, for example `system:serviceaccount:billing:billing-api`. Empty is valid and rejects every caller. Not a secret: it goes in the Helm values |
+| `COURIER_S2S_TOKEN` | empty | **Local only** (`ENV=local`): optional static Bearer token; empty leaves the server open. Ignored (with a warning) in every other environment, do not deploy it |
 
 **Worker**
 
@@ -111,27 +113,62 @@ All settings are environment variables (see `.env.example`).
 | `GRPC_TARGET` | `localhost:9090` |
 | `GRPC_TIMEOUT` | `5s` |
 | `GRPC_INSECURE` | `true` |
-| `COURIER_S2S_TOKEN` | empty | Same secret as courier; sent as `authorization: Bearer` |
+| `COURIER_TOKEN_FILE` | empty | ServiceAccount token file, sent as `authorization: Bearer` (re-read when it changes). Wins over `COURIER_S2S_TOKEN` |
+| `COURIER_S2S_TOKEN` | empty | Static Bearer token for a courier started with `ENV=local` and the same `COURIER_S2S_TOKEN` |
 
 ## Service-to-service auth
 
-Courier uses generic Bearer helpers from `gocommon`. The token is **courier’s** secret; every caller must present it.
+Outside `ENV=local` a caller proves who it is with a Kubernetes ServiceAccount token. Courier asks the API server to review the token (`TokenReview`), accepts it only when the audience is `COURIER_AUTH_AUDIENCE` and the caller is listed in `COURIER_AUTH_ALLOWED`, and logs the caller. There is no shared secret to create or rotate. Details and the `gocommon` API: `grpcserver.WithKubeAuth`, `grpcclient.WithBearerTokenFile` in the [`gocommon` README](https://github.com/huponx/gocommon#service-to-service-auth).
+
+| `ENV` | gRPC auth |
+| --- | --- |
+| `local` | optional: open, or a static Bearer token when `COURIER_S2S_TOKEN` is set |
+| `dev`, `staging`, `production`, anything else | mandatory ServiceAccount tokens; `COURIER_S2S_TOKEN` is ignored |
+
+Health checks (`/grpc.health.v1.Health/*`) skip auth. Courier starts with an empty `COURIER_AUTH_ALLOWED` (and logs a warning), it then rejects every call.
+
+**Courier side.** The chart (`go-application` 1.1.0 or later) creates courier's ServiceAccount and binds it to the ClusterRole `system:auth-delegator`, which is what lets it create `TokenReview`s (`serviceAccount.create` and `rbac.authDelegator`, both on in `charts/courier/values.yaml`; the binding is cluster scoped). Set the audience and the callers in the Application values of `mm-deploy`:
 
 ```yaml
-env:
-  - name: COURIER_S2S_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: courier-s2s-token
-        key: token
+application:                     # alias of the go-application dependency
+  config:
+    data:
+      COURIER_AUTH_AUDIENCE: courier
+      COURIER_AUTH_ALLOWED: "system:serviceaccount:billing:billing-api"
 ```
 
-Mount the same Secret on courier and on callers. `ENV=dev` uses optional auth (empty token = open). Any other `ENV` calls `WithBearerAuth` and panics if the token is missing. gRPC health checks skip auth. See `gocommon` README for the `{RECEIVER}_S2S_TOKEN` convention.
+**Caller side.** Give the caller its own ServiceAccount (not `default`), mount a projected token for the audience `courier` and send it with `grpcclient.WithBearerTokenFile`; then add the caller's `system:serviceaccount:<namespace>:<name>` to `COURIER_AUTH_ALLOWED`:
+
+```yaml
+deployment:
+  serviceAccountName: billing-api        # or serviceAccount.create: true
+  volumes:
+    - name: courier-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              audience: courier
+              expirationSeconds: 3600
+              path: token
+  container:
+    volumeMounts:
+      - name: courier-token
+        mountPath: /var/run/secrets/courier
+        readOnly: true
+```
+
+```go
+conn, err := grpcclient.Dial(ctx, target, grpcclient.WithBearerTokenFile("/var/run/secrets/courier/token"))
+```
+
+**From a laptop** against a real environment: `kubectl create token <sa> -n <namespace> --audience courier --duration 10m > /tmp/courier-token`, then `COURIER_TOKEN_FILE=/tmp/courier-token courierctl ...` (the service account must be in `COURIER_AUTH_ALLOWED`). To work against a local courier use `ENV=local`.
+
+A revoked token can still be accepted for up to a minute (courier caches accepted reviews for 60 s, capped by the token expiry).
 
 ## Kubernetes
 
-- Courier: gRPC health on the API port (`grpcserver` health is on by default; no S2S token required for `/grpc.health.v1.Health`).
-- Worker: liveness `GET /healthz`, readiness `GET /readyz`. On SIGTERM the worker sets ready false, stops consuming, drains in-flight jobs, then shuts down the probe server. The worker does not call courier gRPC and does not need `COURIER_S2S_TOKEN`.
+- Courier: gRPC health on the API port (`grpcserver` health is on by default; no token required for `/grpc.health.v1.Health`).
+- Worker: liveness `GET /healthz`, readiness `GET /readyz`. On SIGTERM the worker sets ready false, stops consuming, drains in-flight jobs, then shuts down the probe server. The worker does not call courier gRPC and does not need any gRPC auth setting.
 
 ## Queue
 

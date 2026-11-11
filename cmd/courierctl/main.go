@@ -66,6 +66,7 @@ func main() {
 		grpcclient.WithTimeout(cfg.Timeout),
 		grpcclient.WithInsecure(cfg.Insecure),
 		grpcclient.WithBearerToken(cfg.S2SToken),
+		grpcclient.WithBearerTokenFile(cfg.TokenFile),
 	)
 	if err != nil {
 		log.Fatal("dial", zap.Error(err))

@@ -5,10 +5,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/huponx/courier/internal/appconfig"
+	"github.com/huponx/courier/internal/auth"
 	"github.com/huponx/courier/internal/notify/render"
 	"github.com/huponx/courier/internal/queue"
 	"github.com/huponx/courier/internal/service"
@@ -53,7 +53,7 @@ func main() {
 	srv := grpcserver.New(
 		grpcserver.WithLogger(log),
 		grpcserver.WithReflection(true),
-		s2sAuth(cfg.Env, cfg.S2SToken),
+		auth.ServerOption(cfg, log),
 	)
 	courierv1.RegisterCourierServiceServer(srv.GRPC, service.New(q, renderer))
 
@@ -79,13 +79,6 @@ func main() {
 	shutCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	srv.Stop(shutCtx)
-}
-
-func s2sAuth(env, token string) grpcserver.Option {
-	if strings.EqualFold(strings.TrimSpace(env), "dev") {
-		return grpcserver.WithOptionalBearerAuth(token)
-	}
-	return grpcserver.WithBearerAuth(token)
 }
 
 func serviceName(name string) string {
