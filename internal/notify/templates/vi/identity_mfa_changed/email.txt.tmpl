@@ -1,0 +1,5 @@
+Xin chào {{.name}},
+
+Xác thực hai bước của tài khoản: {{if eq .change "enabled"}}đã bật{{else if eq .change "disabled"}}đã tắt{{else if eq .change "enforced"}}được quản trị viên bắt buộc{{else if eq .change "reset"}}được quản trị viên đặt lại, hãy thiết lập lại ở lần đăng nhập tới{{else}}{{.change}}{{end}}.
+
+Nếu không phải bạn, hãy liên hệ quản trị viên.

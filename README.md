@@ -63,7 +63,8 @@ PROTO_REF=v0.1.6 PROTO_DIR=protos PROTOGEN_DIR=protogen bash protos/scripts/gene
 
 cd courier
 docker compose up -d          # Redis :6379
-cp .env.example .env          # optional; config is env-based
+cp .env.example .env          # optional; config is env-based. It moves courier to :9091 and the worker probes to :8082
+                              # (defaults 9090/8081 collide with identity and gatekeeper when all run locally)
 
 go run ./cmd/courier
 go run ./cmd/worker

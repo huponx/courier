@@ -1,0 +1,3 @@
+<p>Hello <strong>{{.name}}</strong>,</p>
+<p>Two-step verification on your account: {{if eq .change "enabled"}}turned on{{else if eq .change "disabled"}}turned off{{else if eq .change "enforced"}}now required by your administrator{{else if eq .change "reset"}}reset by your administrator, set it up again at the next sign-in{{else}}{{.change}}{{end}}.</p>
+<p>If this was not you, contact your administrator.</p>
