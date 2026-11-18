@@ -31,6 +31,12 @@ application:
         requests:
           cpu: 50m
           memory: 64Mi
+  # Courier verifies the ServiceAccount tokens of its callers with TokenReview (grpcserver.WithKubeAuth):
+  # its own ServiceAccount needs the ClusterRole system:auth-delegator. Needs go-application >= 1.1.0.
+  serviceAccount:
+    create: true
+  rbac:
+    authDelegator: true
   service:
     enabled: true
     port: 9090
