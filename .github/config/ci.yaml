@@ -37,11 +37,13 @@ global:
   environments:
     dev:
       workflows: [main]
-      automerge: true
+      enabled: false
       labels: [automerge]
     staging:
       workflows: [staging]
-      enabled: true
+      enabled: false
+      labels: [automerge]
     production:
       workflows: [production]
       enabled: true
+      labels: [automerge]
