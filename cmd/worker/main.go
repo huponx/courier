@@ -117,7 +117,8 @@ func consume(
 		}
 
 		for _, msg := range append(claimed, fresh...) {
-			jobCtx := requestctx.WithValues(context.Background(), requestctx.Values{
+			// the logger must be in the context: handle logs through logging.FromCtx (a nop logger otherwise)
+			jobCtx := requestctx.WithValues(logging.WithCtx(context.Background(), log), requestctx.Values{
 				CorrelationID: msg.Job.CorrelationID,
 				UserID:        msg.Job.UserID,
 				TenantID:      msg.Job.TenantID,
