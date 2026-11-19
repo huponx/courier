@@ -3,4 +3,4 @@ dependencies:
   repository: oci://ghcr.io/huponx/charts
   version: 1.1.0
 digest: sha256:a817af6948d873c2f69ee4fd453e1a0b357463aee770d3bb4df6f9d662cbf6ba
-generated: "2026-11-19T03:31:55.427025432Z"
+generated: "2026-11-19T04:46:46.331806684Z"
