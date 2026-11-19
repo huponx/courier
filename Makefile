@@ -26,7 +26,7 @@ help:
 		'clean         remove $(BIN)/'
 
 tidy:
-	$(GO) mod tidy
+	GOWORK=off $(GO) mod tidy
 
 test:
 	$(GO) test ./...
