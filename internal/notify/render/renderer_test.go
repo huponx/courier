@@ -2,7 +2,6 @@ package render
 
 import (
 	"strings"
-	"strings"
 	"testing"
 
 	courierv1 "github.com/huponx/protogen/go/courier/v1"
