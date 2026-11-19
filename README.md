@@ -109,7 +109,7 @@ All settings are environment variables (see `.env.example`).
 | `DEFAULT_LOCALE` | `en` | Template fallback |
 | `REDIS_HOST` / `PORT` / `PASSWORD` / `DB` | `localhost` / `6379` / empty / `0` | |
 | `COURIER_AUTH_AUDIENCE` | `courier` | Audience the callers' ServiceAccount tokens must have (any `ENV` except `local`); the process panics at start if it is blank |
-| `COURIER_AUTH_ALLOWED` | empty | Accepted callers, comma separated, for example `system:serviceaccount:billing:billing-api`. Empty is valid and rejects every caller. Not a secret: it goes in the Helm values |
+| `COURIER_AUTH_ALLOWED` | empty | Accepted callers, comma separated, for example `system:serviceaccount:billing:billing-api`, or the short form `billing:billing-api` (`namespace:name`, needs `gocommon` v0.3.2 or later). In the Helm values it can be a YAML list (needs `go-application` 1.3.0 or later), which the chart joins with commas. Empty is valid and rejects every caller. Not a secret: it goes in the Helm values |
 | `COURIER_S2S_TOKEN` | empty | **Local only** (`ENV=local`): optional static Bearer token; empty leaves the server open. Ignored (with a warning) in every other environment, do not deploy it |
 
 **Worker**
