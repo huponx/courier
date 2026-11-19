@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/huponx/gocommon v0.3.1
+	github.com/huponx/gocommon v0.3.2
 	github.com/huponx/protogen/go v0.1.6
 	github.com/redis/go-redis/v9 v9.23.0
 	go.uber.org/zap v1.28.0
