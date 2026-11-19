@@ -21,3 +21,4 @@ go.work.sum
 # helm dependencies (helm dependency build)
 charts/*/charts/
 charts/*/*.tgz
+charts/*/*.lock

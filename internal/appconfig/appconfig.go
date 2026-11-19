@@ -18,7 +18,8 @@ type Courier struct {
 	S2SToken string `env:"COURIER_S2S_TOKEN"`
 	// AuthAudience is the audience callers' ServiceAccount tokens must have (any ENV except local).
 	AuthAudience string `env:"COURIER_AUTH_AUDIENCE" envDefault:"courier"`
-	// AuthAllowed lists the accepted callers, for example system:serviceaccount:billing:billing-api.
+	// AuthAllowed lists the accepted callers, for example system:serviceaccount:billing:billing-api
+	// or the short form billing:billing-api (expanded by gocommon grpcserver.KubeAuth).
 	// Empty rejects every caller.
 	AuthAllowed []string `env:"COURIER_AUTH_ALLOWED" envSeparator:","`
 }
