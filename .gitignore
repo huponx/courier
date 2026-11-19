@@ -9,6 +9,10 @@ coverage.html
 .env.*
 !.env.example
 
+# local workspace on the sibling checkouts (see README, "Local development")
+go.work
+go.work.sum
+
 .DS_Store
 .idea/
 .vscode/
