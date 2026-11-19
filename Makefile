@@ -22,7 +22,7 @@ help:
 		'redis-up      docker compose up -d' \
 		'redis-down    docker compose down' \
 		'docker        build both images (IMAGE_TAG=dev)' \
-		'generate      buf generate Go stubs (PROTO_REF=vX.Y.Z; needs replace in go.mod)' \
+		'generate      buf generate Go stubs (PROTO_REF=vX.Y.Z; needs go.work, see README)' \
 		'clean         remove $(BIN)/'
 
 tidy:

@@ -56,3 +56,36 @@ func TestIdentityTemplates(t *testing.T) {
 		}
 	}
 }
+
+func TestBvchainTemplates(t *testing.T) {
+	r := New("en")
+	cases := map[string]map[string]string{
+		"bvchain_checkin":         {"shift": "1", "time": "08:31"},
+		"bvchain_checkout":        {"shift": "2", "time": "17:42"},
+		"bvchain_failed":          {"step": "authentication", "error": "login returned no access token"},
+		"bvreport_working_report": {"from_date": "21/09", "to_date": "20/10", "total_in_period": "22", "today": "19/10", "total_to_today": "20", "days_with_cico": "19", "missing_days": "1"},
+	}
+	for _, loc := range []string{"en", "vi"} {
+		for id, data := range cases {
+			msg, err := r.Render(loc, id, courierv1.Channel_CHANNEL_TELEGRAM, data)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", loc, id, err)
+			}
+			if msg.Text == "" || strings.Contains(msg.Text, "{{") || strings.Contains(msg.Text, "<no value>") {
+				t.Fatalf("%s/%s: not rendered: %q", loc, id, msg.Text)
+			}
+			for _, v := range data {
+				if !strings.Contains(msg.Text, v) {
+					t.Fatalf("%s/%s: %q missing from %q", loc, id, v, msg.Text)
+				}
+			}
+		}
+	}
+	// shift 1 is the morning and any other value the afternoon
+	if m, _ := r.Render("vi", "bvchain_checkin", courierv1.Channel_CHANNEL_TELEGRAM, map[string]string{"shift": "1", "time": "x"}); !strings.Contains(m.Text, "sáng") {
+		t.Fatalf("morning shift: %q", m.Text)
+	}
+	if m, _ := r.Render("vi", "bvchain_checkin", courierv1.Channel_CHANNEL_TELEGRAM, map[string]string{"shift": "2", "time": "x"}); !strings.Contains(m.Text, "chiều") {
+		t.Fatalf("afternoon shift: %q", m.Text)
+	}
+}
