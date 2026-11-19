@@ -45,6 +45,17 @@ Lookup: requested locale, then `DEFAULT_LOCALE` (default `en`). Courier rejects 
 
 Email uses `multipart/alternative` when both text and HTML are present. Sample template: `hello` (`en` and `vi`).
 
+Templates in use (all `en` and `vi`; `telegram.txt.tmpl` is plain text, no parse mode):
+
+| `template_id` | Channel | Data keys | Caller |
+|---|---|---|---|
+| `identity_password_reset`, `identity_password_changed`, `identity_mfa_changed` | email | `name`, `link`, `expires_in`, `change` | identity |
+| `bvchain_checkin`, `bvchain_checkout` | telegram | `shift` (`1` morning, `2` afternoon), `time` (`HH:MM`) | bvchain |
+| `bvchain_failed` | telegram | `step`, `error` | bvchain, bvreport |
+| `bvreport_working_report` | telegram | `from_date`, `to_date`, `total_in_period`, `today`, `total_to_today`, `days_with_cico`, `missing_days` | bvreport |
+
+Try a template without the caller: `courierctl --template bvchain_checkin --channel telegram --address <chat_id> --data shift=1 --data time=08:30`.
+
 ## Adding a channel
 
 1. Add a proto enum value (`CHANNEL_SLACK = 30`) and regenerate stubs.
@@ -54,11 +65,15 @@ Email uses `multipart/alternative` when both text and HTML are present. Sample t
 
 ## Local development
 
-This repo expects sibling checkouts of `gocommon` and `protogen` (`replace` in `go.mod`).
+`go.mod` pins released versions of `gocommon` and `protogen`. To work against the sibling checkouts instead, use a Go workspace (`go.work` is git-ignored and not sent to Docker builds):
+
+```bash
+go work init . ../gocommon ../protogen/go   # once, in courier/; delete go.work to go back to the pinned versions
+```
 
 ```bash
 # from the monorepo root — regenerate Go stubs after proto changes
-# (also uncomment the local `replace` lines in courier/go.mod)
+# (the stubs of ../protogen/go are used through go.work)
 PROTO_REF=v0.1.6 PROTO_DIR=protos PROTOGEN_DIR=protogen bash protos/scripts/generate.sh go
 
 cd courier
