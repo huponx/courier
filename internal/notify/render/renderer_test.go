@@ -35,6 +35,7 @@ func TestIdentityTemplates(t *testing.T) {
 	r := New("en")
 	cases := map[string]map[string]string{
 		"identity_password_reset":   {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "30"},
+		"identity_welcome":          {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "7"},
 		"identity_password_changed": {"name": "Hu"},
 		"identity_mfa_changed":      {"name": "Hu", "change": "reset"},
 	}
@@ -50,7 +51,7 @@ func TestIdentityTemplates(t *testing.T) {
 			if strings.Contains(msg.Text, "{{") || strings.Contains(msg.HTML, "<no value>") {
 				t.Fatalf("%s/%s: not rendered: %q", loc, id, msg.Text)
 			}
-			if id == "identity_password_reset" && (!strings.Contains(msg.Text, data["link"]) || !strings.Contains(msg.HTML, data["link"])) {
+			if (id == "identity_password_reset" || id == "identity_welcome") && (!strings.Contains(msg.Text, data["link"]) || !strings.Contains(msg.HTML, data["link"])) {
 				t.Fatalf("%s: link missing", loc)
 			}
 		}
