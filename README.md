@@ -49,7 +49,7 @@ Templates in use (all `en` and `vi`; `telegram.txt.tmpl` is plain text, no parse
 
 | `template_id` | Channel | Data keys | Caller |
 |---|---|---|---|
-| `identity_password_reset`, `identity_password_changed`, `identity_mfa_changed` | email | `name`, `link`, `expires_in`, `change` | identity |
+| `identity_password_reset`, `identity_welcome`, `identity_password_changed`, `identity_mfa_changed` | email | `name`, `link`, `expires_in` (minutes for the reset, days for the welcome), `change` | identity |
 | `bvchain_checkin`, `bvchain_checkout` | telegram | `shift` (`1` morning, `2` afternoon), `time` (`HH:MM`) | bvchain |
 | `bvchain_failed` | telegram | `step`, `error` | bvchain, bvreport |
 | `bvreport_working_report` | telegram | `from_date`, `to_date`, `total_in_period`, `today`, `total_to_today`, `days_with_cico`, `missing_days` | bvreport |
