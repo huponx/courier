@@ -4,8 +4,8 @@ go 1.26.10
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/huponx/gocommon v0.3.2
-	github.com/huponx/protogen/go v0.1.6
+	github.com/huponx/gocommon v0.4.0
+	github.com/huponx/protogen/go v0.1.8
 	github.com/redis/go-redis/v9 v9.23.0
 	go.uber.org/zap v1.28.0
 	google.golang.org/grpc v1.85.0
@@ -38,7 +38,7 @@ require (
 	github.com/quic-go/quic-go v0.65.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
-	go.mongodb.org/mongo-driver/v2 v2.10.0 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.10.1 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.33.0 // indirect
