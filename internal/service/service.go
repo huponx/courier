@@ -26,28 +26,28 @@ func New(q *queue.Client, renderer *render.Renderer) *Server {
 func (s *Server) SendNotification(ctx context.Context, req *courierv1.SendNotificationRequest) (*courierv1.SendNotificationResponse, error) {
 	locale := render.NormalizeLocale(req.GetLocale())
 	if locale == "" {
-		return nil, apperror.InvalidArgument("locale is required")
+		return nil, apperror.InvalidArgument("locale is required").WithReason("locale_required")
 	}
 	templateID := strings.TrimSpace(req.GetTemplateId())
 	if templateID == "" {
-		return nil, apperror.InvalidArgument("template_id is required")
+		return nil, apperror.InvalidArgument("template_id is required").WithReason("template_id_required")
 	}
 	if len(req.GetRecipients()) == 0 {
-		return nil, apperror.InvalidArgument("recipients is required")
+		return nil, apperror.InvalidArgument("recipients is required").WithReason("recipients_required")
 	}
 
 	for _, rec := range req.GetRecipients() {
 		if rec.GetChannel() == courierv1.Channel_CHANNEL_UNSPECIFIED {
-			return nil, apperror.InvalidArgument("recipients.channel is required")
+			return nil, apperror.InvalidArgument("recipients.channel is required").WithReason("recipient_channel_required")
 		}
 		if _, ok := notify.Slug(rec.GetChannel()); !ok {
-			return nil, apperror.InvalidArgument("recipients.channel is not supported")
+			return nil, apperror.InvalidArgument("recipients.channel is not supported").WithReason("recipient_channel_unsupported")
 		}
 		if strings.TrimSpace(rec.GetAddress()) == "" {
-			return nil, apperror.InvalidArgument("recipients.address is required")
+			return nil, apperror.InvalidArgument("recipients.address is required").WithReason("recipient_address_required")
 		}
 		if !s.renderer.Has(locale, templateID, rec.GetChannel()) {
-			return nil, apperror.InvalidArgument("template not found for recipient channel")
+			return nil, apperror.InvalidArgument("template not found for recipient channel").WithReason("template_not_found")
 		}
 	}
 
@@ -56,7 +56,7 @@ func (s *Server) SendNotification(ctx context.Context, req *courierv1.SendNotifi
 	if idempKey != "" {
 		existing, claimed, err := s.queue.ClaimIdempotency(ctx, idempKey, notificationID)
 		if err != nil {
-			return nil, apperror.Unavailable("idempotency store failed")
+			return nil, apperror.Unavailable("idempotency store failed").WithReason("idempotency_store_failed")
 		}
 		if !claimed {
 			return &courierv1.SendNotificationResponse{NotificationId: existing, Queued: 0}, nil
@@ -84,7 +84,7 @@ func (s *Server) SendNotification(ctx context.Context, req *courierv1.SendNotifi
 			if idempKey != "" {
 				_ = s.queue.DeleteIdempotency(ctx, idempKey)
 			}
-			return nil, apperror.Unavailable("enqueue failed")
+			return nil, apperror.Unavailable("enqueue failed").WithReason("enqueue_failed")
 		}
 		queued++
 	}
