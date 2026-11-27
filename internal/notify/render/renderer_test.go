@@ -34,10 +34,13 @@ func TestHelloTemplates(t *testing.T) {
 func TestIdentityTemplates(t *testing.T) {
 	r := New("en")
 	cases := map[string]map[string]string{
-		"identity_password_reset":   {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "30"},
-		"identity_welcome":          {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "7"},
-		"identity_password_changed": {"name": "Hu"},
-		"identity_mfa_changed":      {"name": "Hu", "change": "reset"},
+		"identity_password_reset":        {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "30"},
+		"identity_welcome":               {"name": "Hu", "link": "https://auth.example.com/password/reset?token=abc", "expires_in": "7"},
+		"identity_password_changed":      {"name": "Hu"},
+		"identity_mfa_changed":           {"name": "Hu", "change": "reset"},
+		"identity_registration_received": {"name": "Hu"},
+		"identity_registration_rejected": {"name": "Hu"},
+		"identity_registration_pending":  {"name": "Ad", "applicant_name": "Hu", "applicant_email": "hu@example.com", "link": "https://admin.example.com/users?status=awaiting_approval"},
 	}
 	for _, loc := range []string{"en", "vi"} {
 		for id, data := range cases {
@@ -51,10 +54,44 @@ func TestIdentityTemplates(t *testing.T) {
 			if strings.Contains(msg.Text, "{{") || strings.Contains(msg.HTML, "<no value>") {
 				t.Fatalf("%s/%s: not rendered: %q", loc, id, msg.Text)
 			}
+			if !strings.Contains(msg.HTML, "<!doctype html>") || !strings.Contains(msg.HTML, "MM") {
+				t.Fatalf("%s/%s: not set into the layout", loc, id)
+			}
+			if id == "identity_registration_pending" {
+				if !strings.Contains(msg.Text, "hu@example.com") || !strings.Contains(msg.HTML, data["link"]) {
+					t.Fatalf("%s: applicant or link missing", loc)
+				}
+				noLink, err := r.Render(loc, id, courierv1.Channel_CHANNEL_EMAIL, map[string]string{"name": "Ad", "applicant_name": "Hu", "applicant_email": "hu@example.com"})
+				if err != nil || strings.Contains(noLink.HTML, "href") || strings.Contains(noLink.Text, "http") {
+					t.Fatalf("%s: without link: %v %+v", loc, err, noLink)
+				}
+			}
 			if (id == "identity_password_reset" || id == "identity_welcome") && (!strings.Contains(msg.Text, data["link"]) || !strings.Contains(msg.HTML, data["link"])) {
 				t.Fatalf("%s: link missing", loc)
 			}
 		}
+	}
+}
+
+func TestBrandDefaultsAndCallerOverride(t *testing.T) {
+	r := New("en")
+	r.SetDefaults(map[string]string{"brand": "Acme", "logo_url": "https://acme.example/logo.png"})
+	render := func(data map[string]string) string {
+		m, err := r.Render("en", "identity_password_changed", courierv1.Channel_CHANNEL_EMAIL, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.HTML
+	}
+	if h := render(map[string]string{"name": "Hu"}); !strings.Contains(h, "Acme") || !strings.Contains(h, "https://acme.example/logo.png") {
+		t.Errorf("defaults not used: %s", h)
+	}
+	h := render(map[string]string{"name": "Hu", "brand": "Other", "logo_url": "https://other.example/l.png"})
+	if !strings.Contains(h, "Other") || !strings.Contains(h, "https://other.example/l.png") || strings.Contains(h, "Acme") {
+		t.Errorf("caller does not override: %s", h)
+	}
+	if h := render(map[string]string{"name": "Hu", "brand": ""}); !strings.Contains(h, "Acme") {
+		t.Errorf("an empty brand from the caller hides the default: %s", h)
 	}
 }
 
@@ -88,5 +125,20 @@ func TestBvchainTemplates(t *testing.T) {
 	}
 	if m, _ := r.Render("vi", "bvchain_checkin", courierv1.Channel_CHANNEL_TELEGRAM, map[string]string{"shift": "2", "time": "x"}); !strings.Contains(m.Text, "chiều") {
 		t.Fatalf("afternoon shift: %q", m.Text)
+	}
+}
+
+func TestPasskeyMails(t *testing.T) {
+	r := New("en")
+	for _, loc := range []string{"en", "vi"} {
+		for _, change := range []string{"passkey_added", "passkey_removed"} {
+			msg, err := r.Render(loc, "identity_mfa_changed", courierv1.Channel_CHANNEL_EMAIL, map[string]string{"name": "Hu", "change": change})
+			if err != nil {
+				t.Fatalf("%s/%s: %v", loc, change, err)
+			}
+			if strings.Contains(msg.Subject+msg.Text, "changed:") || strings.Contains(msg.Subject, "Two-step") || strings.Contains(msg.Subject, "Xác thực hai bước") {
+				t.Errorf("%s/%s fell through to the generic text: %q", loc, change, msg.Subject)
+			}
+		}
 	}
 }
