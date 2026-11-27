@@ -1,0 +1,10 @@
+Hello {{.name}},
+
+Someone registered and waits for your decision.
+
+Name: {{.applicant_name}}
+E-mail: {{.applicant_email}}
+{{if .link}}
+Review request: {{.link}}
+{{end}}
+You can approve or reject the request there. No link is sent to the applicant until you approve.

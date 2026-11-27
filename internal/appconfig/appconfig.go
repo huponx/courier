@@ -42,6 +42,12 @@ type Worker struct {
 	SMTPUser        string        `env:"SMTP_USER"`
 	SMTPPassword    string        `env:"SMTP_PASSWORD"`
 	SMTPFrom        string        `env:"SMTP_FROM"`
+	// MailDir: write every e-mail as HTML and text files into this directory instead of sending it (local runs).
+	MailDir string `env:"MAIL_DIR"`
+	// MailBrand and MailLogoURL are the name and the logo (a PNG on a public https address) at the top of every HTML email.
+	// A caller that sends `brand` or `logo_url` in the template data wins over them.
+	MailBrand   string `env:"MAIL_BRAND"`
+	MailLogoURL string `env:"MAIL_LOGO_URL"`
 }
 
 type Client struct {

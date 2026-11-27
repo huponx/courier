@@ -1,1 +1,1 @@
-Xác thực hai bước: {{.change}}
+{{if eq .change "passkey_added"}}Đã thêm một khóa truy cập vào tài khoản của bạn{{else if eq .change "passkey_removed"}}Đã xóa một khóa truy cập khỏi tài khoản của bạn{{else}}Xác thực hai bước {{if eq .change "enabled"}}đã bật{{else if eq .change "disabled"}}đã tắt{{else if eq .change "enforced"}}hiện là bắt buộc{{else if eq .change "reset"}}đã được đặt lại{{else}}đã thay đổi{{end}}{{end}}

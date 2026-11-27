@@ -41,7 +41,7 @@ Embedded under `internal/notify/templates/{locale}/{template_id}/`:
 | `email.html.tmpl` | Email text/html (`html/template`) |
 | `telegram.txt.tmpl` | Telegram body |
 
-Lookup: requested locale, then `DEFAULT_LOCALE` (default `en`). Courier rejects the RPC if no matching parts exist. The worker renders at send time.
+Lookup: requested locale, then `DEFAULT_LOCALE` (default `en`). Courier rejects the RPC if no matching parts exist. The worker renders at send time. The HTML part of an email is set into `templates/<locale>/layout.html.tmpl` (logo, card, footer; the template file is its `content` block, `brand` in the data overrides the default name "MM"); a locale without a layout sends the part as it is.
 
 Email uses `multipart/alternative` when both text and HTML are present. Sample template: `hello` (`en` and `vi`).
 
@@ -49,7 +49,7 @@ Templates in use (all `en` and `vi`; `telegram.txt.tmpl` is plain text, no parse
 
 | `template_id` | Channel | Data keys | Caller |
 |---|---|---|---|
-| `identity_password_reset`, `identity_welcome`, `identity_password_changed`, `identity_mfa_changed` | email | `name`, `link`, `expires_in` (minutes for the reset, days for the welcome), `change` | identity |
+| `identity_password_reset`, `identity_welcome`, `identity_password_changed`, `identity_mfa_changed` | email | `name`, `link`, `expires_in` (minutes for the reset, days for the welcome), `change` (for `identity_mfa_changed`: `enabled`, `disabled`, `enforced`, `reset`, `passkey_added`, `passkey_removed`) | identity |
 | `bvchain_checkin`, `bvchain_checkout` | telegram | `shift` (`1` morning, `2` afternoon), `time` (`HH:MM`) | bvchain |
 | `bvchain_failed` | telegram | `step`, `error` | bvchain, bvreport |
 | `bvreport_working_report` | telegram | `from_date`, `to_date`, `total_in_period`, `today`, `total_to_today`, `days_with_cico`, `missing_days` | bvreport |
@@ -121,6 +121,8 @@ All settings are environment variables (see `.env.example`).
 | `QUEUE_CLAIM_MIN_IDLE` | `30s` | `XAUTOCLAIM` idle time |
 | `TELEGRAM_BOT_TOKEN` | | Required to send Telegram |
 | `SMTP_HOST` / `PORT` / `USER` / `PASSWORD` / `FROM` | port `587` | Required to send email |
+| `MAIL_BRAND` / `MAIL_LOGO_URL` | empty (name `MM`, logo drawn as a letter tile) | Name and logo (a PNG on a public https address; mail clients do not draw SVG) at the top of every HTML email. A caller that sends `brand` or `logo_url` in the template data wins over them |
+| `MAIL_DIR` | empty | Local runs: write every email as `<UTC time>_<to>_<subject>.html` and `.txt` into this directory instead of sending it (replaces SMTP; `scripts/local.sh` sets it to `.local/mails`) |
 
 **courierctl**
 
