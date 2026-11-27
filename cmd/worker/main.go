@@ -51,16 +51,19 @@ func main() {
 	}
 
 	renderer := render.New(cfg.DefaultLocale)
-	reg := notify.NewRegistry(
-		email.New(email.Config{
-			Host:     cfg.SMTPHost,
-			Port:     cfg.SMTPPort,
-			User:     cfg.SMTPUser,
-			Password: cfg.SMTPPassword,
-			From:     cfg.SMTPFrom,
-		}),
-		telegram.New(cfg.TelegramToken),
-	)
+	renderer.SetDefaults(map[string]string{"brand": cfg.MailBrand, "logo_url": cfg.MailLogoURL})
+	var mailer notify.Channel = email.New(email.Config{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		User:     cfg.SMTPUser,
+		Password: cfg.SMTPPassword,
+		From:     cfg.SMTPFrom,
+	})
+	if cfg.MailDir != "" {
+		log.Info("mails are written to files, not sent", zap.String("dir", cfg.MailDir))
+		mailer = email.NewFile(cfg.MailDir)
+	}
+	reg := notify.NewRegistry(mailer, telegram.New(cfg.TelegramToken))
 
 	run := worker.New(worker.WithLogger(log))
 	h := worker.NewHealth(cfg.HealthAddr, healthz.Check{

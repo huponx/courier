@@ -16,6 +16,31 @@ import (
 type Renderer struct {
 	fs            fs.FS
 	defaultLocale string
+	defaults      map[string]string
+}
+
+// SetDefaults sets template data every message gets unless the caller sent the key itself (the brand and the logo of the
+// emails, for example). An empty value is not a default.
+func (r *Renderer) SetDefaults(d map[string]string) {
+	r.defaults = map[string]string{}
+	for k, v := range d {
+		if v != "" {
+			r.defaults[k] = v
+		}
+	}
+}
+
+func (r *Renderer) withDefaults(data map[string]string) map[string]string {
+	out := make(map[string]string, len(data)+len(r.defaults))
+	for k, v := range r.defaults {
+		out[k] = v
+	}
+	for k, v := range data {
+		if v != "" || r.defaults[k] == "" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func New(defaultLocale string) *Renderer {
@@ -48,9 +73,7 @@ func (r *Renderer) Render(locale, templateID string, ch courierv1.Channel, data 
 		return notify.Message{}, err
 	}
 	slug, _ := notify.Slug(ch)
-	if data == nil {
-		data = map[string]string{}
-	}
+	data = r.withDefaults(data)
 
 	var msg notify.Message
 	switch ch {
@@ -66,7 +89,7 @@ func (r *Renderer) Render(locale, templateID string, ch courierv1.Channel, data 
 			}
 		}
 		if exists(r.fs, path.Join(dir, slug+".html.tmpl")) {
-			msg.HTML, err = execHTML(r.fs, path.Join(dir, slug+".html.tmpl"), data)
+			msg.HTML, err = execHTML(r.fs, path.Join(dir, slug+".html.tmpl"), path.Join(path.Dir(dir), layoutFile), data)
 			if err != nil {
 				return notify.Message{}, err
 			}
@@ -142,17 +165,34 @@ func execText(fsys fs.FS, name string, data map[string]string) (string, error) {
 	return buf.String(), nil
 }
 
-func execHTML(fsys fs.FS, name string, data map[string]string) (string, error) {
+// layoutFile is the page every HTML mail of a locale is set into (<locale>/layout.html.tmpl): the logo, the card and the
+// footer. The page of a template is its "content" block; a locale without a layout sends the page as it is.
+const layoutFile = "layout.html.tmpl"
+
+func execHTML(fsys fs.FS, name, layout string, data map[string]string) (string, error) {
 	raw, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		return "", err
 	}
-	tpl, err := template.New(path.Base(name)).Parse(string(raw))
-	if err != nil {
+	run := path.Base(name)
+	var tpl *template.Template
+	if exists(fsys, layout) {
+		lraw, err := fs.ReadFile(fsys, layout)
+		if err != nil {
+			return "", err
+		}
+		if tpl, err = template.New("layout").Parse(string(lraw)); err != nil {
+			return "", fmt.Errorf("parse %s: %w", layout, err)
+		}
+		if _, err = tpl.New("content").Parse(string(raw)); err != nil {
+			return "", fmt.Errorf("parse %s: %w", name, err)
+		}
+		run = "layout"
+	} else if tpl, err = template.New(run).Parse(string(raw)); err != nil {
 		return "", fmt.Errorf("parse %s: %w", name, err)
 	}
 	var buf bytes.Buffer
-	if err := tpl.Execute(&buf, data); err != nil {
+	if err := tpl.ExecuteTemplate(&buf, run, data); err != nil {
 		return "", fmt.Errorf("exec %s: %w", name, err)
 	}
 	return buf.String(), nil

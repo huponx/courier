@@ -1,5 +1,5 @@
 Xin chào {{.name}},
 
-Xác thực hai bước của tài khoản: {{if eq .change "enabled"}}đã bật{{else if eq .change "disabled"}}đã tắt{{else if eq .change "enforced"}}được quản trị viên bắt buộc{{else if eq .change "reset"}}được quản trị viên đặt lại, hãy thiết lập lại ở lần đăng nhập tới{{else}}{{.change}}{{end}}.
+{{if eq .change "enabled"}}Xác thực hai bước đã được bật cho tài khoản của bạn.{{else if eq .change "disabled"}}Xác thực hai bước đã được tắt cho tài khoản của bạn.{{else if eq .change "enforced"}}Quản trị viên hiện yêu cầu xác thực hai bước cho tài khoản của bạn.{{else if eq .change "reset"}}Quản trị viên đã đặt lại xác thực hai bước. Hãy thiết lập lại ở lần đăng nhập tới.{{else if eq .change "passkey_added"}}Một khóa truy cập đã được thêm vào tài khoản của bạn. Bạn có thể dùng nó để đăng nhập.{{else if eq .change "passkey_removed"}}Một khóa truy cập đã được xóa khỏi tài khoản của bạn.{{else}}Xác thực hai bước của tài khoản đã thay đổi: {{.change}}.{{end}}
 
 Nếu không phải bạn, hãy liên hệ quản trị viên.
