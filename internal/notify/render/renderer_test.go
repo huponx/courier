@@ -131,7 +131,7 @@ func TestBvchainTemplates(t *testing.T) {
 func TestPasskeyMails(t *testing.T) {
 	r := New("en")
 	for _, loc := range []string{"en", "vi"} {
-		for _, change := range []string{"passkey_added", "passkey_removed"} {
+		for _, change := range []string{"passkey_added", "passkey_removed", "recovery_regenerated"} {
 			msg, err := r.Render(loc, "identity_mfa_changed", courierv1.Channel_CHANNEL_EMAIL, map[string]string{"name": "Hu", "change": change})
 			if err != nil {
 				t.Fatalf("%s/%s: %v", loc, change, err)

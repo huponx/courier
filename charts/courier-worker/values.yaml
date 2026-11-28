@@ -2,6 +2,11 @@
 # image.tag is written at release time (update-deployment-values); the default only keeps `helm template` working.
 application:
   deployment:
+    # Prometheus scrapes /metrics of METRICS_ADDR (:9100), see docs/prometheus-rules.yaml for the alerts
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9100"
+      prometheus.io/path: /metrics
     container:
       image:
         repository: huponx/courier-worker
@@ -41,7 +46,9 @@ application:
     data:
       HEALTH_ADDR: ":8081"
       LOG_ENCODING: json
-  # Secret values stay out of git: reference existing Secrets (mm-deploy overrides this list).
+  # Secret values stay out of git: reference existing Secrets (mm-deploy overrides this list). Both courier
+  # and its worker need POSTGRES_PASSWORD (and REDIS_PASSWORD if Redis has one); POSTGRES_HOST/DB/USER go in
+  # config.data of the Application values.
   secrets: []
   autoscaling:
     enabled: false

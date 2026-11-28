@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/huponx/courier/internal/notify"
+	"github.com/huponx/gocommon/netsafe"
 	courierv1 "github.com/huponx/protogen/go/courier/v1"
 )
 
@@ -18,7 +21,7 @@ type Sender struct {
 }
 
 func New(token string) *Sender {
-	return &Sender{token: token, httpClient: http.DefaultClient}
+	return &Sender{token: token, httpClient: &http.Client{Timeout: 15 * time.Second}}
 }
 
 func (s *Sender) ID() courierv1.Channel {
@@ -53,7 +56,7 @@ func (s *Sender) Send(ctx context.Context, dest notify.Destination, msg notify.M
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return err
+		return netsafe.Scrub(err) // the URL of the request holds the token of the bot
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
@@ -64,10 +67,20 @@ func (s *Sender) Send(ctx context.Context, dest notify.Destination, msg notify.M
 	}
 	_ = json.Unmarshal(body, &parsed)
 	if resp.StatusCode >= 300 || !parsed.OK {
+		err := fmt.Errorf("telegram: status %d", resp.StatusCode)
 		if parsed.Description != "" {
-			return fmt.Errorf("telegram: %s", parsed.Description)
+			err = fmt.Errorf("telegram: %s", parsed.Description)
 		}
-		return fmt.Errorf("telegram: status %d", resp.StatusCode)
+		// 400 (chat not found, bad request) and 403 (bot blocked, user deactivated) never succeed on a retry;
+		// 429 and 5xx do.
+		if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusForbidden {
+			// 403: the user blocked the bot or deactivated the account; 400 "chat not found": the chat is gone
+			if resp.StatusCode == http.StatusForbidden || strings.Contains(strings.ToLower(parsed.Description), "chat not found") {
+				err = fmt.Errorf("%w: %w", notify.ErrRecipientGone, err)
+			}
+			return notify.Permanent(err)
+		}
+		return err
 	}
 	return nil
 }
