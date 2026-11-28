@@ -278,7 +278,7 @@ gRPC between the services is plaintext by default. TLS is **server-side only** (
 | dictionary → identity | identity | dictionary `DICTIONARY_IDENTITY_INSECURE=false` |
 | bvchain, bvreport → courier | courier | `COURIER_INSECURE=false` |
 | identity → courier (notify) | courier | identity `COURIER_INSECURE=false` |
-| gatekeeper → identity / courier / dictionary | each | `GATEKEEPER_UPSTREAM_INSECURE=false` (or `insecure: false` of one upstream in `routes.yaml`) |
+| gatekeeper → identity / courier / dictionary | each | `routes.upstreams.<name>.insecure: false` in the gatekeeper Application values, one upstream per hop (the chart renders it into `routes.yaml`). Not `GATEKEEPER_UPSTREAM_INSECURE`: it flips every upstream at once |
 
 **Prerequisite (mm-ansible).** cert-manager (add-on of the `microk8s` role) and the internal CA of that role (`internal_issuer_name`, default `internal-ca`: a `selfSigned` issuer, the CA `Certificate` in `cert-manager`, a `ClusterIssuer` of type `ca`). The ACME issuer cannot sign `*.svc` names. Run `make deploy TAGS=microk8s` once per cluster, then `kubectl get clusterissuer internal-ca` must be `Ready`.
 
@@ -291,7 +291,7 @@ gRPC between the services is plaintext by default. TLS is **server-side only** (
 1. server Application: `GRPC_TLS_CERT_FILE: /var/run/tls/tls.crt` and `GRPC_TLS_KEY_FILE: /var/run/tls/tls.key` (identity here);
 2. client Application: its `*_INSECURE` variable `"false"`.
 
-A gRPC port cannot serve both modes, so expect a short burst of `Unavailable` that the retries of the clients absorb. Because a server serves TLS to *all* its callers, switch every client of that server in the same sync (identity serves courier, dictionary and gatekeeper). Verify: the courier log shows `permissions registered` and no `Unavailable`; then the next hop. Rollback of a hop: the client variable back to `true` and remove the two server variables. Renew test: `cmctl renew identity-grpc-tls -n application`; the next handshake serves the new certificate with no restart.
+A gRPC port cannot serve both modes, so expect a short burst of `Unavailable` that the retries of the clients absorb. Because a server serves TLS to *all* its callers, switch every client of that server in the same sync (identity serves courier, dictionary and gatekeeper; courier serves bvchain, bvreport, identity and gatekeeper; dictionary serves gatekeeper). The gatekeeper chart must be a version that renders `insecure` per upstream. Verify: the courier log shows `permissions registered` and no `Unavailable`; then the next hop. Rollback of a hop: the client variable back to `true` and remove the two server variables. Renew test: `cmctl renew identity-grpc-tls -n application`; the next handshake serves the new certificate with no restart.
 
 **Not covered** (stay HTTP in the cluster): the JWKS and token URLs (`COURIER_JWKS_URL`, `DICTIONARY_JWKS_URL`, `IDENTITY_TOKEN_URL`, `DICTIONARY_TOKEN_URL`) and the back-channel logout of identity to gatekeeper. They are a separate change.
 
