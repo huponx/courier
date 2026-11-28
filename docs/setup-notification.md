@@ -52,7 +52,19 @@ Secrets live in the `mm-ansible` vault (never in `mm-deploy`). See "Identity and
 | `postgres-data-rw-credentials` | `password` | already there | courier and worker `POSTGRES_PASSWORD` |
 | `telegram-...-credentials` | `bot-token` | already there | worker `TELEGRAM_BOT_TOKEN` |
 
-Add them to the vault as `application-courier-client:` / `application-courier-vapid:`, then `make deploy TAGS=secrets`; the pods must restart (Reloader does it).
+Two places in `mm-ansible` must know each Secret, or it is never created in the cluster:
+
+1. the **value** in the vault (`k8s_secrets_vault.yml`), as `application-courier-client:` / `application-courier-vapid:` under `vault_k8s_secrets`;
+2. the **entry** in the list `k8s_secrets.yml` (a Secret that is not listed is not touched):
+
+   ```yaml
+   - name: courier-client
+     namespace: application
+   - name: courier-vapid
+     namespace: application
+   ```
+
+Put the vault value in first (a listed Secret without a vault key makes the `secrets` run fail), then `make deploy TAGS=secrets`; the pods must restart (Reloader does it).
 
 ### VAPID key (Web Push)
 
@@ -129,6 +141,7 @@ Check: in the admin app → Roles & Permissions you must see 7 `courier:*` permi
 | `COURIER_ISSUER` | issuer of identity (`https://auth.<env>…`) |
 | `COURIER_JWKS_URL` | `http://identity.application.svc.cluster.local:8080/.well-known/jwks.json` |
 | `IDENTITY_TARGET` | `identity.application.svc.cluster.local:9090` |
+| `IDENTITY_INSECURE` | `true` by default (plaintext gRPC, as in-cluster); `false` only if the target is behind TLS |
 | `IDENTITY_TOKEN_URL` | `http://identity.application.svc.cluster.local:8080/oauth2/token` |
 | `IDENTITY_CLIENT_ID` + secret `IDENTITY_CLIENT_SECRET` | `courier` + `courier-client` |
 | `TELEGRAM_BOT_USERNAME` | bot username; empty hides the Telegram section |
@@ -234,6 +247,7 @@ cd web && pnpm run ci
 
 | Symptom | Usual cause | Fix |
 | --- | --- | --- |
+| `permission registration failed ... tls: first record does not look like a TLS handshake` | courier dials identity with TLS but identity speaks plaintext gRPC (a version before `IDENTITY_INSECURE` only allowed plaintext in `ENV=local`) | upgrade courier; keep `IDENTITY_INSECURE` at its default `true` |
 | courier exits after ~2 minutes with `permission sync` | the `courier` client is missing, lacks the `service_registrar` role, or has a wrong secret | run the identity setup Job; check `courier-client` |
 | every identity mail fails with `user_resolution_disabled` / `identity_unavailable` | no `IDENTITY_TARGET`/client credentials, or the `user_directory` role / `courier → identity` policy is missing | see sections 5–6 |
 | the bell is empty, `401/403` from `/api/notifications` | the `gatekeeper → courier` policy is missing, or `COURIER_ISSUER/JWKS_URL` is empty | see sections 5–6 |
