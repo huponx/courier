@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/huponx/courier/internal/appconfig"
@@ -153,7 +152,7 @@ func identityResolver(ctx context.Context, cfg appconfig.Courier, log *zap.Logge
 		log.Warn("IDENTITY_TARGET is empty: Notify accepts raw recipients only, user_ids are refused")
 		return nil, nil
 	}
-	opts := []grpcclient.Option{grpcclient.WithLogger(log), grpcclient.WithInsecure(strings.EqualFold(cfg.Env, "local"))}
+	opts := []grpcclient.Option{grpcclient.WithLogger(log), grpcclient.WithInsecure(cfg.IdentityInsecure)}
 	if cfg.IdentityClientID == "" {
 		log.Warn("no IDENTITY_CLIENT_ID: identity calls carry no token and will be refused (client credentials of the client `courier`)")
 	} else {

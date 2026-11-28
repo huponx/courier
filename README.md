@@ -251,6 +251,7 @@ All settings are environment variables (see `.env.example`).
 | `METRICS_ADDR` | `:9100` | Where `/metrics` is served (courier and worker); empty turns it off |
 | `COURIER_ISSUER` / `COURIER_JWKS_URL` | empty | `iss` of the user tokens and where identity publishes its keys, for `InboxService`. Empty: user tokens are refused |
 | `IDENTITY_TARGET` | empty | identity gRPC address to resolve `user_ids`; empty refuses them |
+| `IDENTITY_INSECURE` | `true` | plaintext gRPC to identity (the in-cluster default; identity has no TLS of its own). `false` only for a target behind TLS |
 | `IDENTITY_TOKEN_URL` / `IDENTITY_CLIENT_ID` / `IDENTITY_CLIENT_SECRET` / `IDENTITY_AUDIENCE` | empty / empty / empty / `identity` | Client credentials of courier in identity (secret in a Secret); the same client, `courier-dev`, is used by `scripts/local.sh` |
 | `USER_CACHE_TTL` | `60s` | How long a resolved user is cached |
 | `COURIER_AUTH_AUDIENCE` | `courier` | Audience the callers' ServiceAccount tokens must have (any `ENV` except `local`); the process panics at start if it is blank |
