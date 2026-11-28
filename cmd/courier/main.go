@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/huponx/courier/internal/appconfig"
 	"github.com/huponx/courier/internal/auth"
@@ -145,7 +146,11 @@ func jwtVerifier(cfg appconfig.Courier, log *zap.Logger) *jwtx.Verifier {
 		log.Warn("COURIER_ISSUER or COURIER_JWKS_URL is empty: user tokens are refused, the inbox does not work")
 		return nil
 	}
-	keys, err := jwtx.NewRemoteKeySet(jwtx.RemoteKeySetConfig{URL: cfg.JWKSURL})
+	hc, err := tlsconfig.HTTPClientForURL(cfg.JWKSURL, cfg.ClientTLS(), 5*time.Second)
+	if err != nil {
+		log.Fatal("jwks tls", zap.Error(err))
+	}
+	keys, err := jwtx.NewRemoteKeySet(jwtx.RemoteKeySetConfig{URL: cfg.JWKSURL, HTTPClient: hc})
 	if err != nil {
 		log.Fatal("jwks", zap.Error(err))
 	}
@@ -169,8 +174,12 @@ func identityResolver(ctx context.Context, cfg appconfig.Courier, log *zap.Logge
 	if cfg.IdentityClientID == "" {
 		log.Warn("no IDENTITY_CLIENT_ID: identity calls carry no token and will be refused (client credentials of the client `courier`)")
 	} else {
+		hc, err := tlsconfig.HTTPClientForURL(cfg.IdentityTokenURL, cfg.ClientTLS(), 5*time.Second)
+		if err != nil {
+			log.Fatal("token endpoint tls", zap.Error(err))
+		}
 		tc, err := tokenexchange.New(tokenexchange.Config{
-			TokenURL: cfg.IdentityTokenURL, ClientID: cfg.IdentityClientID, ClientSecret: cfg.IdentityClientSecret,
+			TokenURL: cfg.IdentityTokenURL, ClientID: cfg.IdentityClientID, ClientSecret: cfg.IdentityClientSecret, HTTPClient: hc,
 		})
 		if err != nil {
 			log.Fatal("identity client credentials", zap.Error(err))
