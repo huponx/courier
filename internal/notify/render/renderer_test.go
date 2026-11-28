@@ -142,3 +142,25 @@ func TestPasskeyMails(t *testing.T) {
 		}
 	}
 }
+
+func TestRegistrationDigestMail(t *testing.T) {
+	r := New("en")
+	for _, locale := range []string{"en", "vi"} {
+		msg, err := r.Render(locale, "identity_registration_pending_digest", courierv1.Channel_CHANNEL_EMAIL, map[string]string{
+			"name": "Hu", "count": "2", "link": "https://admin.example.com/registrations",
+			"items": "Ann <ann@example.com> registered\nBob registered",
+		})
+		if err != nil {
+			t.Fatal(locale, err)
+		}
+		// every event is its own row, escaped on its own, inside the layout of the other mails
+		for _, want := range []string{"Ann &lt;ann@example.com&gt; registered</td>", ">Bob registered</td>", `width="20"`, "https://admin.example.com/registrations", "<html"} {
+			if !strings.Contains(msg.HTML, want) {
+				t.Errorf("%s: html lacks %q:\n%s", locale, want, msg.HTML)
+			}
+		}
+		if strings.Contains(msg.HTML, "<ann@example.com>") {
+			t.Errorf("%s: an item was not escaped", locale)
+		}
+	}
+}

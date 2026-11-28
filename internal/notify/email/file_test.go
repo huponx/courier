@@ -1,6 +1,7 @@
 package email
 
 import (
+	"bufio"
 	"context"
 	"net"
 	"os"
@@ -79,5 +80,78 @@ func TestStalledServerEndsWithTheContext(t *testing.T) {
 	err = s.Send(ctx, notify.Destination{Address: "b@x.io"}, notify.Message{Subject: "s", Text: "t"})
 	if err == nil || time.Since(began) > 5*time.Second {
 		t.Fatalf("took %s, err %v", time.Since(began), err)
+	}
+}
+
+// fakeSMTP accepts one mail and returns the MAIL FROM and RCPT TO lines it saw.
+func fakeSMTP(t *testing.T) (host string, port int, lines <-chan string) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	got := make(chan string, 8)
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		r := bufio.NewReader(c)
+		reply := func(s string) { _, _ = c.Write([]byte(s + "\r\n")) }
+		reply("220 fake")
+		inData := false
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				return
+			}
+			line = strings.TrimRight(line, "\r\n")
+			switch {
+			case inData:
+				if line == "." {
+					inData = false
+					reply("250 queued")
+				}
+			case strings.HasPrefix(line, "EHLO"), strings.HasPrefix(line, "HELO"):
+				reply("250 fake")
+			case strings.HasPrefix(line, "MAIL FROM"), strings.HasPrefix(line, "RCPT TO"):
+				got <- line
+				reply("250 ok")
+			case line == "DATA":
+				inData = true
+				reply("354 go")
+			case line == "QUIT":
+				reply("221 bye")
+				return
+			default:
+				reply("250 ok")
+			}
+		}
+	}()
+	host, portText, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ = strconv.Atoi(portText)
+	return host, port, got
+}
+
+func TestEnvelopeTakesTheBareAddress(t *testing.T) {
+	host, port, lines := fakeSMTP(t)
+	// SMTP_FROM with a display name is what production has; the server must see only the address
+	s := New(Config{Host: host, Port: port, From: "MMFamily <home@x.io>"})
+	err := s.Send(context.Background(), notify.Destination{Address: "Ann <ann@x.io>"}, notify.Message{Subject: "s", Text: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if from, rcpt := <-lines, <-lines; from != "MAIL FROM:<home@x.io>" || rcpt != "RCPT TO:<ann@x.io>" {
+		t.Fatalf("envelope %q %q", from, rcpt)
+	}
+}
+
+func TestRecipientThatIsNoAddressIsPermanent(t *testing.T) {
+	s := New(Config{Host: "127.0.0.1", Port: 1, From: "a@x.io"})
+	err := s.Send(context.Background(), notify.Destination{Address: "not an address"}, notify.Message{Subject: "s", Text: "t"})
+	if err == nil || !notify.IsPermanent(err) {
+		t.Fatalf("want a permanent error, got %v", err)
 	}
 }
