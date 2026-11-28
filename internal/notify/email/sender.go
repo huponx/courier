@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"net/textproto"
 	"strings"
@@ -53,8 +54,18 @@ func (s *Sender) Send(ctx context.Context, dest notify.Destination, msg notify.M
 	if err != nil {
 		return err
 	}
+	// the envelope takes the bare address: SMTP_FROM may be "Name <addr>" (the header keeps the name), and a
+	// recipient that is not an address is refused here instead of by the server
+	from, err := envelopeAddr(s.cfg.From)
+	if err != nil {
+		return fmt.Errorf("SMTP_FROM: %w", err)
+	}
+	to, err := envelopeAddr(dest.Address)
+	if err != nil {
+		return notify.Permanent(fmt.Errorf("recipient: %w", err))
+	}
 
-	return classify(s.deliver(ctx, dest.Address, body))
+	return classify(s.deliver(ctx, from, to, body))
 }
 
 // ioTimeout bounds the whole conversation with the SMTP server: smtp.SendMail has no deadline, so a server that accepts
@@ -62,7 +73,7 @@ func (s *Sender) Send(ctx context.Context, dest notify.Destination, msg notify.M
 const ioTimeout = 60 * time.Second
 
 // deliver is smtp.SendMail with a dial timeout and a deadline on the connection (it also follows the context).
-func (s *Sender) deliver(ctx context.Context, to string, body []byte) error {
+func (s *Sender) deliver(ctx context.Context, from, to string, body []byte) error {
 	addr := net.JoinHostPort(s.cfg.Host, fmt.Sprintf("%d", s.cfg.Port))
 	conn, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -89,7 +100,7 @@ func (s *Sender) deliver(ctx context.Context, to string, body []byte) error {
 			return err
 		}
 	}
-	if err := c.Mail(s.cfg.From); err != nil {
+	if err := c.Mail(from); err != nil {
 		return err
 	}
 	if err := c.Rcpt(to); err != nil {
@@ -106,6 +117,15 @@ func (s *Sender) deliver(ctx context.Context, to string, body []byte) error {
 		return err
 	}
 	return c.Quit()
+}
+
+// envelopeAddr is the bare address of "addr" or "Name <addr>", what MAIL FROM and RCPT TO take.
+func envelopeAddr(v string) (string, error) {
+	a, err := mail.ParseAddress(strings.TrimSpace(v))
+	if err != nil {
+		return "", fmt.Errorf("not an e-mail address: %w", err)
+	}
+	return a.Address, nil
 }
 
 // classify marks a 5xx reply of the SMTP server (mailbox unavailable, bad address) as permanent;

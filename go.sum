@@ -50,10 +50,10 @@ github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/huponx/gocommon v0.7.1 h1:+JDMqPHwCACtErMt8ZZ3wlWvd3kuRXc17mEjgh5D9DQ=
-github.com/huponx/gocommon v0.7.1/go.mod h1:Avfxb4wZjYd04L8Hi/FPhkA7wr1Q3+kZXIJAYZ9TM0M=
-github.com/huponx/protogen/go v0.3.1 h1:4Q8zybdDW/gJOYFCLD8Y9IA9SMuwFUzY+hRBx3yEdFQ=
-github.com/huponx/protogen/go v0.3.1/go.mod h1:lbzMEyJd70W+iGJNE1cGnT7KxZ1lKniDqp26VYBej2E=
+github.com/huponx/gocommon v0.8.0 h1:p8CeG88R9KwjiHlpRFj3uXFichktnCLtgrYj7PZPpqc=
+github.com/huponx/gocommon v0.8.0/go.mod h1:7jrWRWEib8CuMNGY84bRtok8ynLQeH7S6M57mzIOJKc=
+github.com/huponx/protogen/go v0.4.0 h1:zIjD0+MOHtnV6XAp2YXFUGOeJZWkozUFg5g26ygw04c=
+github.com/huponx/protogen/go v0.4.0/go.mod h1:lbzMEyJd70W+iGJNE1cGnT7KxZ1lKniDqp26VYBej2E=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=
