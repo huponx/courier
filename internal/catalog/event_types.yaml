@@ -1,0 +1,106 @@
+# The contract of every event courier can send. A caller names a type; courier validates `data` against it,
+# picks the channels and the template. `template` is a directory of internal/notify/templates/<locale>/.
+#
+#   category    group for user preferences (a later phase)
+#   channels    default channels for user_ids: email | telegram | in_app | push (a browser notification on the devices the
+#               user subscribed; it renders the in_app templates). telegram needs a chat binding (a later phase).
+#               in_app writes the inbox of the user (templates in_app.title.tmpl and in_app.body.tmpl); the link of the
+#               item is data.link, so give in_app only to events whose link is safe to keep (never a reset link).
+#   digest      {window: 15m, group_by: [key, ...]}: events of the type that come within the window (and have the same
+#               values of the keys) reach each recipient as one message per channel, rendered from the template
+#               <template>_digest (data: count, items = one line per event, and the values of the first event). Never for a
+#               mandatory type; the inbox is not grouped.
+#   broadcast   an administrator can send it to an audience (the announcements of the admin app)
+#   severity    of the inbox item: info (default) | warning | critical
+#   mandatory   the user cannot turn it off (security)
+#   required    keys of `data` that must be present
+#   optional    keys that may be present; any other key is rejected
+#               (`name`, `brand` and `logo_url` are always accepted: courier fills `name` from the user)
+event_types:
+  - type: security.password_reset
+    category: security
+    template: identity_password_reset
+    channels: [email]
+    mandatory: true
+    required: [link, expires_in]
+
+  - type: security.password_changed
+    category: security
+    template: identity_password_changed
+    channels: [email, in_app, push]
+    severity: warning
+    mandatory: true
+
+  - type: security.mfa_changed
+    category: security
+    template: identity_mfa_changed
+    channels: [email, in_app, push]
+    severity: warning
+    mandatory: true
+    required: [change]
+
+  - type: account.welcome
+    category: account
+    template: identity_welcome
+    channels: [email]
+    mandatory: true
+    required: [link, expires_in]
+
+  - type: account.registration_received
+    category: account
+    template: identity_registration_received
+    channels: [email]
+    mandatory: true
+
+  - type: account.registration_rejected
+    category: account
+    template: identity_registration_rejected
+    channels: [email]
+    mandatory: true
+
+  - type: account.registration_pending
+    category: admin
+    template: identity_registration_pending
+    channels: [email, in_app, push]
+    required: [applicant_name, applicant_email]
+    optional: [link]
+    digest: {window: 10m}
+
+  - type: bvchain.checkin
+    category: bvchain
+    template: bvchain_checkin
+    channels: [telegram]
+    required: [shift, time]
+
+  - type: bvchain.checkout
+    category: bvchain
+    template: bvchain_checkout
+    channels: [telegram]
+    required: [shift, time]
+
+  - type: bvchain.failed
+    category: bvchain
+    template: bvchain_failed
+    channels: [telegram]
+    required: [step, error]
+    digest: {window: 10m, group_by: [step]}
+
+  - type: bvchain.working_report
+    category: bvchain
+    template: bvreport_working_report
+    channels: [telegram]
+    required: [days_with_cico, from_date, missing_days, to_date, today, total_in_period, total_to_today]
+
+  - type: system.hello
+    category: system
+    template: hello
+    channels: [email, telegram]
+    optional: [name]
+
+  - type: system.announcement
+    category: system
+    template: system_announcement
+    channels: [email, in_app, push]
+    broadcast: true
+    required: [title, message]
+    optional: [link]
