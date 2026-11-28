@@ -39,6 +39,9 @@ type Courier struct {
 	// IdentityTarget is the identity gRPC address courier resolves user_ids with (GetUser, permission
 	// identity:user:read). Empty: Notify accepts raw recipients only.
 	IdentityTarget string `env:"IDENTITY_TARGET"`
+	// IdentityInsecure dials identity without TLS, the in-cluster default (identity has no TLS of its own, as for the
+	// gatekeeper upstreams). Set false only for a target behind TLS.
+	IdentityInsecure bool `env:"IDENTITY_INSECURE" envDefault:"true"`
 	// Client credentials of courier in identity (confidential client with a role holding identity:user:read and
 	// an exchange policy courier -> identity). They win over IdentityToken outside ENV=local.
 	IdentityTokenURL     string `env:"IDENTITY_TOKEN_URL"`
