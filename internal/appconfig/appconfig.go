@@ -11,6 +11,8 @@ type Courier struct {
 	config.Log
 	config.Redis
 	config.Postgres
+	// GRPCTLS: the certificate courier serves gRPC with and the CA it trusts when it dials identity securely.
+	config.GRPCTLS
 	// MetricsAddr serves /metrics for Prometheus (the queue state, the outcome of the calls). Empty: no metrics.
 	config.Metrics
 	Host            string        `env:"HOST" envDefault:"0.0.0.0"`
@@ -39,8 +41,8 @@ type Courier struct {
 	// IdentityTarget is the identity gRPC address courier resolves user_ids with (GetUser, permission
 	// identity:user:read). Empty: Notify accepts raw recipients only.
 	IdentityTarget string `env:"IDENTITY_TARGET"`
-	// IdentityInsecure dials identity without TLS, the in-cluster default (identity has no TLS of its own, as for the
-	// gatekeeper upstreams). Set false only for a target behind TLS.
+	// IdentityInsecure dials identity without TLS, the default. Set false once identity serves TLS (GRPC_TLS_CERT_FILE
+	// there); the CA to trust is GRPC_TLS_CA_FILE.
 	IdentityInsecure bool `env:"IDENTITY_INSECURE" envDefault:"true"`
 	// Client credentials of courier in identity (confidential client with a role holding identity:user:read and
 	// an exchange policy courier -> identity). They win over IdentityToken outside ENV=local.
@@ -113,6 +115,7 @@ type Worker struct {
 type Client struct {
 	config.Log
 	config.GRPCClient
+	config.GRPCTLS
 	// TokenFile is a ServiceAccount token file (projected volume). A local courier does not authenticate services.
 	TokenFile string `env:"COURIER_TOKEN_FILE"`
 }

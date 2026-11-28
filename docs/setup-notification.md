@@ -141,7 +141,7 @@ Check: in the admin app → Roles & Permissions you must see 7 `courier:*` permi
 | `COURIER_ISSUER` | issuer of identity (`https://auth.<env>…`) |
 | `COURIER_JWKS_URL` | `http://identity.application.svc.cluster.local:8080/.well-known/jwks.json` |
 | `IDENTITY_TARGET` | `identity.application.svc.cluster.local:9090` |
-| `IDENTITY_INSECURE` | `true` by default (plaintext gRPC, as in-cluster); `false` only if the target is behind TLS |
+| `IDENTITY_INSECURE` | `true` by default (plaintext gRPC). Set `false` once identity serves TLS (see section 14); the CA to trust is `GRPC_TLS_CA_FILE` |
 | `IDENTITY_TOKEN_URL` | `http://identity.application.svc.cluster.local:8080/oauth2/token` |
 | `IDENTITY_CLIENT_ID` + secret `IDENTITY_CLIENT_SECRET` | `courier` + `courier-client` |
 | `TELEGRAM_BOT_USERNAME` | bot username; empty hides the Telegram section |
@@ -247,7 +247,9 @@ cd web && pnpm run ci
 
 | Symptom | Usual cause | Fix |
 | --- | --- | --- |
-| `permission registration failed ... tls: first record does not look like a TLS handshake` | courier dials identity with TLS but identity speaks plaintext gRPC (a version before `IDENTITY_INSECURE` only allowed plaintext in `ENV=local`) | upgrade courier; keep `IDENTITY_INSECURE` at its default `true` |
+| `permission registration failed ... tls: first record does not look like a TLS handshake` | courier dials identity with TLS (`IDENTITY_INSECURE=false`) but identity speaks plaintext gRPC | set `IDENTITY_INSECURE` back to `true`, or enable TLS on identity (section 14). The inverse (plaintext client, TLS server) shows the same text in the **server** log |
+| `x509: certificate signed by unknown authority` | the client does not trust the CA of the server certificate | mount the CA and set `GRPC_TLS_CA_FILE` (section 14); the same CA must have signed the server |
+| `x509: certificate is valid for a, b, not c` | the name the client dials is not in the certificate | dial `<svc>.application.svc(.cluster.local)`, add the name to `dnsNames` of the `Certificate`, or set `GRPC_TLS_SERVER_NAME` |
 | courier exits after ~2 minutes with `permission sync` | the `courier` client is missing, lacks the `service_registrar` role, or has a wrong secret | run the identity setup Job; check `courier-client` |
 | every identity mail fails with `user_resolution_disabled` / `identity_unavailable` | no `IDENTITY_TARGET`/client credentials, or the `user_directory` role / `courier → identity` policy is missing | see sections 5–6 |
 | the bell is empty, `401/403` from `/api/notifications` | the `gatekeeper → courier` policy is missing, or `COURIER_ISSUER/JWKS_URL` is empty | see sections 5–6 |
@@ -265,3 +267,32 @@ cd web && pnpm run ci
 | a template was edited but messages still use the old one | `TEMPLATE_RELOAD` (30s) has not passed yet | wait; check the log `templates: reload failed` |
 | delivery `retry` with `channel push is not available on this worker` | the worker has no `VAPID_*` (or runs an old version during a rolling deploy) | set the key; the delivery is retried by backoff |
 | `link_invalid` when calling `Notify` | `data.link` is not a `/...` path or an http(s) URL | fix the caller |
+
+## 14. TLS for in-cluster gRPC
+
+gRPC between the services is plaintext by default. TLS is **server-side only** (the server presents a certificate; no client certificate): callers are still authenticated by their ServiceAccount token, JWT or client credentials. It is decided per hop, so it can be switched on one hop at a time. The code is `gocommon/tlsconfig` (see the gocommon README).
+
+| Hop | Server (certificate) | Client switch |
+| --- | --- | --- |
+| courier → identity | identity | courier `IDENTITY_INSECURE=false` |
+| dictionary → identity | identity | dictionary `DICTIONARY_IDENTITY_INSECURE=false` |
+| bvchain, bvreport → courier | courier | `COURIER_INSECURE=false` |
+| identity → courier (notify) | courier | identity `COURIER_INSECURE=false` |
+| gatekeeper → identity / courier / dictionary | each | `GATEKEEPER_UPSTREAM_INSECURE=false` (or `insecure: false` of one upstream in `routes.yaml`) |
+
+**Prerequisite (mm-ansible).** cert-manager (add-on of the `microk8s` role) and the internal CA of that role (`internal_issuer_name`, default `internal-ca`: a `selfSigned` issuer, the CA `Certificate` in `cert-manager`, a `ClusterIssuer` of type `ca`). The ACME issuer cannot sign `*.svc` names. Run `make deploy TAGS=microk8s` once per cluster, then `kubectl get clusterissuer internal-ca` must be `Ready`.
+
+**Certificates (mm-deploy).** `infra-services/<env>/certificates/{identity,courier,dictionary}.yaml`: one `Certificate` each, `issuerRef: internal-ca`, `dnsNames: <svc>.application.svc[.cluster.local]`, Secret `<svc>-grpc-tls` with `tls.crt`, `tls.key`, `ca.crt`. The root app `infra-<env>` of mm-ansible syncs `infra-services/<env>` recursively (`recurse: true`); the manifests name `namespace: application` themselves, so they land there although that root's default namespace is `infrastructure`. cert-manager renews the Secret in place; the servers reload the files without a restart.
+
+**Mounts (charts).** The charts mount the Secret read-only at `/var/run/tls` (`optional: true`, so a pod starts before the certificate exists) and set `GRPC_TLS_CA_FILE=/var/run/tls/ca.crt`: identity, courier and dictionary mount their own Secret; gatekeeper mounts `ca.crt` of `identity-grpc-tls` and bvchain/bvreport `ca.crt` of `courier-grpc-tls`. With one internal CA every `ca.crt` is the same. The lists live in the charts, not in the Application values, because Helm replaces a list instead of merging it: `deployment.volumes` in mm-deploy would drop the chart's own volumes (identity signing key, gatekeeper routes). The gRPC probes are `tcpSocket`/HTTP, which work unchanged with TLS.
+
+**Switch one hop on** (start with courier → identity, the least traffic), in the *same* sync of mm-deploy:
+
+1. server Application: `GRPC_TLS_CERT_FILE: /var/run/tls/tls.crt` and `GRPC_TLS_KEY_FILE: /var/run/tls/tls.key` (identity here);
+2. client Application: its `*_INSECURE` variable `"false"`.
+
+A gRPC port cannot serve both modes, so expect a short burst of `Unavailable` that the retries of the clients absorb. Because a server serves TLS to *all* its callers, switch every client of that server in the same sync (identity serves courier, dictionary and gatekeeper). Verify: the courier log shows `permissions registered` and no `Unavailable`; then the next hop. Rollback of a hop: the client variable back to `true` and remove the two server variables. Renew test: `cmctl renew identity-grpc-tls -n application`; the next handshake serves the new certificate with no restart.
+
+**Not covered** (stay HTTP in the cluster): the JWKS and token URLs (`COURIER_JWKS_URL`, `DICTIONARY_JWKS_URL`, `IDENTITY_TOKEN_URL`, `DICTIONARY_TOKEN_URL`) and the back-channel logout of identity to gatekeeper. They are a separate change.
+
+**Locally.** `scripts/local.sh` stays plaintext. `TLS=1 scripts/local.sh up backend` generates a throwaway CA and a certificate for `localhost` in `.local/tls`, serves every gRPC port with it and turns every `*_INSECURE` switch off; `TLS=1 python3 courier/scripts/smoke-local.py` then runs the whole stack over TLS. `TLS=1 TLS_WRONG_CA=1` gives the services another CA, so every hop fails with `unknown authority`.

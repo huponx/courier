@@ -7,11 +7,22 @@ application:
       prometheus.io/scrape: "true"
       prometheus.io/port: "9100"
       prometheus.io/path: /metrics
+    volumes:
+      # In-cluster gRPC TLS (certificate of cert-manager, see the TLS section of courier/docs/setup-notification.md).
+      # Optional: the pod starts without it, nothing reads it until GRPC_TLS_* / *_INSECURE=false are set.
+      - name: grpc-tls
+        secret:
+          secretName: courier-grpc-tls
+          optional: true
     container:
       image:
         repository: huponx/courier
         tag: "0.0.0"
       port: 9090
+      volumeMounts:
+        - name: grpc-tls
+          mountPath: /var/run/tls
+          readOnly: true
       # config.data below becomes the ConfigMap <name>-env-vars, loaded as environment variables.
       envFrom:
         - configMapRef:
@@ -50,6 +61,8 @@ application:
       HOST: "0.0.0.0"
       PORT: "9090"
       LOG_ENCODING: json
+      # the CA trusted by the gRPC clients of this service; used only once a *_INSECURE variable is false
+      GRPC_TLS_CA_FILE: /var/run/tls/ca.crt
   # Secret values stay out of git: reference existing Secrets (mm-deploy overrides this list). Both courier
   # and its worker need POSTGRES_PASSWORD (and REDIS_PASSWORD if Redis has one); POSTGRES_HOST/DB/USER go in
   # config.data of the Application values.

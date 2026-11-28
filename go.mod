@@ -6,7 +6,7 @@ require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0
-	github.com/huponx/gocommon v0.6.0
+	github.com/huponx/gocommon v0.7.0
 	github.com/huponx/protogen/go v0.3.1
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/prometheus/client_golang v1.25.0
