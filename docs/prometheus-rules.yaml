@@ -1,0 +1,57 @@
+# Alerts of courier. A PrometheusRule for the Prometheus operator; for a plain Prometheus copy `spec.groups` into a rule
+# file. Thresholds are a starting point: tune them to the volume of the system.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: courier
+spec:
+  groups:
+    - name: courier
+      rules:
+        # a delivery gave up (out of attempts) or hit a permanent error: somebody did not get a message
+        - alert: CourierDeliveryDead
+          expr: sum by (channel) (increase(courier_delivery_attempts_total{outcome="dead"}[15m])) > 0
+          for: 0m
+          labels: {severity: warning}
+          annotations:
+            summary: "courier gave up on {{ $value | printf \"%.0f\" }} {{ $labels.channel }} deliveries in 15 minutes"
+            description: "Look at the delivery log of the admin app (status Gave up); fix the cause (SMTP, Telegram) and Retry them."
+
+        - alert: CourierSendErrorsHigh
+          expr: |
+            sum by (channel) (rate(courier_delivery_attempts_total{outcome=~"retry|failed|dead"}[10m]))
+              / clamp_min(sum by (channel) (rate(courier_delivery_attempts_total[10m])), 0.001) > 0.3
+            and sum by (channel) (rate(courier_delivery_attempts_total[10m])) > 0.02
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "more than 30% of the {{ $labels.channel }} sends fail"
+
+        # the workers are down or stuck: something is due and nobody sends it
+        - alert: CourierQueueStuck
+          expr: courier_oldest_due_delivery_age_seconds > 600
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: "a due delivery has waited {{ $value | humanizeDuration }}: the workers are not sending"
+            description: "Check the courier-worker pods and their logs; the relay and the stream consumer run there."
+
+        - alert: CourierStreamBacklog
+          expr: courier_stream_length > 1000
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $value }} messages in the courier stream"
+
+        - alert: CourierDependencyDown
+          expr: courier_dependency_up == 0
+          for: 2m
+          labels: {severity: critical}
+          annotations:
+            summary: "courier cannot reach {{ $labels.dependency }}"
+
+        - alert: CourierNotifyErrors
+          expr: sum(increase(courier_notify_total{result="error"}[10m])) > 5
+          labels: {severity: warning}
+          annotations:
+            summary: "courier failed to accept {{ $value | printf \"%.0f\" }} notifications in 10 minutes (identity, PostgreSQL or Redis)"

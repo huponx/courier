@@ -27,10 +27,9 @@ func TestIsLocal(t *testing.T) {
 	}
 }
 
-func courierCfg(env, token, audience string, allowed ...string) appconfig.Courier {
+func courierCfg(env, audience string, allowed ...string) appconfig.Courier {
 	var c appconfig.Courier
 	c.Env = env
-	c.S2SToken = token
 	c.AuthAudience = audience
 	c.AuthAllowed = allowed
 	return c
@@ -46,19 +45,15 @@ func hasWarning(ws []string, sub string) bool {
 }
 
 func TestAuthSettingsLocal(t *testing.T) {
-	local, _, ws := authSettings(courierCfg("local", "", "courier"))
-	if !local || !hasWarning(ws, "auth is disabled") {
-		t.Fatalf("local without a token must warn that auth is off: local=%v warnings=%v", local, ws)
-	}
-	local, _, ws = authSettings(courierCfg("local", "s3cret", "courier"))
-	if !local || len(ws) != 0 {
-		t.Fatalf("local with a token has optional auth enabled and no warning: local=%v warnings=%v", local, ws)
+	local, _, ws := authSettings(courierCfg("local", "courier"))
+	if !local || !hasWarning(ws, "auth of services is disabled") {
+		t.Fatalf("local must warn that service auth is off: local=%v warnings=%v", local, ws)
 	}
 }
 
 func TestAuthSettingsRequiresKubeAuthEverywhereElse(t *testing.T) {
 	for _, env := range []string{"dev", "staging", "production", "", "foo"} {
-		local, kube, _ := authSettings(courierCfg(env, "", "courier", " system:serviceaccount:a:b ", "", "system:serviceaccount:c:d"))
+		local, kube, _ := authSettings(courierCfg(env, "courier", " system:serviceaccount:a:b ", "", "system:serviceaccount:c:d"))
 		if local {
 			t.Fatalf("ENV=%q must not be local", env)
 		}
@@ -73,19 +68,12 @@ func TestAuthSettingsRequiresKubeAuthEverywhereElse(t *testing.T) {
 }
 
 func TestAuthSettingsEmptyAllowedWarnsButIsValid(t *testing.T) {
-	_, kube, ws := authSettings(courierCfg("production", "", "courier"))
+	_, kube, ws := authSettings(courierCfg("production", "courier"))
 	if len(kube.AllowedSubjects) != 0 || !hasWarning(ws, "every gRPC caller is rejected") {
 		t.Fatalf("allowed=%v warnings=%v", kube.AllowedSubjects, ws)
 	}
-	_, _, ws = authSettings(courierCfg("production", "", "courier", "", "  "))
+	_, _, ws = authSettings(courierCfg("production", "courier", "", "  "))
 	if !hasWarning(ws, "every gRPC caller is rejected") {
 		t.Fatalf("blank entries count as empty: %v", ws)
-	}
-}
-
-func TestAuthSettingsIgnoresStaticTokenOutsideLocal(t *testing.T) {
-	_, _, ws := authSettings(courierCfg("staging", "left-over", "courier", "system:serviceaccount:a:b"))
-	if !hasWarning(ws, "COURIER_S2S_TOKEN is ignored") {
-		t.Fatalf("warnings %v", ws)
 	}
 }

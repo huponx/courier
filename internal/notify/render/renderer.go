@@ -14,7 +14,11 @@ import (
 )
 
 type Renderer struct {
+	// fs is what is read: the edited templates over base (the built-in ones). overlay is nil for a renderer
+	// built with NewFS on a file system of its own.
 	fs            fs.FS
+	base          fs.FS
+	overlay       *Overlay
 	defaultLocale string
 	defaults      map[string]string
 }
@@ -55,7 +59,8 @@ func NewFS(fsys fs.FS, defaultLocale string) *Renderer {
 	if defaultLocale == "" {
 		defaultLocale = "en"
 	}
-	return &Renderer{fs: fsys, defaultLocale: strings.ToLower(defaultLocale)}
+	ov := NewOverlay(fsys)
+	return &Renderer{fs: ov, base: fsys, overlay: ov, defaultLocale: strings.ToLower(defaultLocale)}
 }
 
 func NormalizeLocale(locale string) string {
@@ -72,7 +77,7 @@ func (r *Renderer) Render(locale, templateID string, ch courierv1.Channel, data 
 	if err != nil {
 		return notify.Message{}, err
 	}
-	slug, _ := notify.Slug(ch)
+	slug, _ := notify.TemplateSlug(ch)
 	data = r.withDefaults(data)
 
 	var msg notify.Message
@@ -99,6 +104,16 @@ func (r *Renderer) Render(locale, templateID string, ch courierv1.Channel, data 
 		if err != nil {
 			return notify.Message{}, err
 		}
+	case courierv1.Channel_CHANNEL_IN_APP, courierv1.Channel_CHANNEL_PUSH:
+		// the title is the Subject, the body is the Text
+		msg.Subject, err = execText(r.fs, path.Join(dir, slug+".title.tmpl"), data)
+		if err != nil {
+			return notify.Message{}, err
+		}
+		msg.Text, err = execText(r.fs, path.Join(dir, slug+".body.tmpl"), data)
+		if err != nil {
+			return notify.Message{}, err
+		}
 	default:
 		return notify.Message{}, fmt.Errorf("unsupported channel %s", ch.String())
 	}
@@ -106,7 +121,7 @@ func (r *Renderer) Render(locale, templateID string, ch courierv1.Channel, data 
 }
 
 func (r *Renderer) resolveDir(locale, templateID string, ch courierv1.Channel) (string, error) {
-	slug, ok := notify.Slug(ch)
+	slug, ok := notify.TemplateSlug(ch)
 	if !ok {
 		return "", fmt.Errorf("unknown channel")
 	}
@@ -135,6 +150,8 @@ func (r *Renderer) hasParts(dir, slug string, ch courierv1.Channel) bool {
 		return exists(r.fs, path.Join(dir, slug+".txt.tmpl")) || exists(r.fs, path.Join(dir, slug+".html.tmpl"))
 	case courierv1.Channel_CHANNEL_TELEGRAM:
 		return exists(r.fs, path.Join(dir, slug+".txt.tmpl"))
+	case courierv1.Channel_CHANNEL_IN_APP, courierv1.Channel_CHANNEL_PUSH:
+		return exists(r.fs, path.Join(dir, slug+".title.tmpl")) && exists(r.fs, path.Join(dir, slug+".body.tmpl"))
 	default:
 		return false
 	}
@@ -154,7 +171,7 @@ func execText(fsys fs.FS, name string, data map[string]string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tpl, err := texttemplate.New(path.Base(name)).Parse(string(raw))
+	tpl, err := texttemplate.New(path.Base(name)).Option("missingkey=zero").Parse(string(raw))
 	if err != nil {
 		return "", fmt.Errorf("parse %s: %w", name, err)
 	}
@@ -181,14 +198,14 @@ func execHTML(fsys fs.FS, name, layout string, data map[string]string) (string, 
 		if err != nil {
 			return "", err
 		}
-		if tpl, err = template.New("layout").Parse(string(lraw)); err != nil {
+		if tpl, err = template.New("layout").Option("missingkey=zero").Parse(string(lraw)); err != nil {
 			return "", fmt.Errorf("parse %s: %w", layout, err)
 		}
 		if _, err = tpl.New("content").Parse(string(raw)); err != nil {
 			return "", fmt.Errorf("parse %s: %w", name, err)
 		}
 		run = "layout"
-	} else if tpl, err = template.New(run).Parse(string(raw)); err != nil {
+	} else if tpl, err = template.New(run).Option("missingkey=zero").Parse(string(raw)); err != nil {
 		return "", fmt.Errorf("parse %s: %w", name, err)
 	}
 	var buf bytes.Buffer
