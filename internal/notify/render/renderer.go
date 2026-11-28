@@ -166,12 +166,29 @@ func exists(fsys fs.FS, name string) bool {
 	return true
 }
 
+// funcs are what the templates can call: lines splits a digest's `items` (one event per line) so a template can lay
+// them out as rows; it is also what lets an HTML mail escape every line on its own.
+func lines(s string) []string {
+	var out []string
+	for _, l := range strings.Split(s, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+var (
+	htmlFuncs = template.FuncMap{"lines": lines}
+	textFuncs = texttemplate.FuncMap{"lines": lines}
+)
+
 func execText(fsys fs.FS, name string, data map[string]string) (string, error) {
 	raw, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		return "", err
 	}
-	tpl, err := texttemplate.New(path.Base(name)).Option("missingkey=zero").Parse(string(raw))
+	tpl, err := texttemplate.New(path.Base(name)).Funcs(textFuncs).Option("missingkey=zero").Parse(string(raw))
 	if err != nil {
 		return "", fmt.Errorf("parse %s: %w", name, err)
 	}
@@ -198,14 +215,14 @@ func execHTML(fsys fs.FS, name, layout string, data map[string]string) (string, 
 		if err != nil {
 			return "", err
 		}
-		if tpl, err = template.New("layout").Option("missingkey=zero").Parse(string(lraw)); err != nil {
+		if tpl, err = template.New("layout").Funcs(htmlFuncs).Option("missingkey=zero").Parse(string(lraw)); err != nil {
 			return "", fmt.Errorf("parse %s: %w", layout, err)
 		}
 		if _, err = tpl.New("content").Parse(string(raw)); err != nil {
 			return "", fmt.Errorf("parse %s: %w", name, err)
 		}
 		run = "layout"
-	} else if tpl, err = template.New(run).Option("missingkey=zero").Parse(string(raw)); err != nil {
+	} else if tpl, err = template.New(run).Funcs(htmlFuncs).Option("missingkey=zero").Parse(string(raw)); err != nil {
 		return "", fmt.Errorf("parse %s: %w", name, err)
 	}
 	var buf bytes.Buffer
