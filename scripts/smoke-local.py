@@ -74,7 +74,9 @@ threading.Thread(target=sse, daemon=True).start()
 time.sleep(2)
 check("SSE stream opened as text/event-stream with a first count", events and events[0][1:] == (200, "text/event-stream") and any(isinstance(e, dict) and "unread" in e for e in events), events)
 
-env = dict(os.environ, GRPC_TARGET="localhost:9091", GRPC_INSECURE="true", ENV="local")
+tls = os.environ.get("TLS") == "1"  # stack started with `TLS=1 scripts/local.sh up`
+env = dict(os.environ, GRPC_TARGET="localhost:9091", GRPC_INSECURE="false" if tls else "true", ENV="local")
+if tls: env["GRPC_TLS_CA_FILE"] = ROOT + "/.local/tls/ca.crt"  # courierctl always trusts the real CA
 def ctl(*args):
     p = subprocess.run(["go", "run", "./cmd/courierctl", *args], cwd=ROOT + "/courier", env=env, capture_output=True, text=True)
     return p.returncode, (p.stdout + p.stderr)

@@ -82,12 +82,16 @@ func main() {
 	defer logging.Sync(log)
 
 	ctx := context.Background()
-	conn, err := grpcclient.Dial(ctx, cfg.Target,
+	dialOpts := []grpcclient.Option{
 		grpcclient.WithLogger(log),
 		grpcclient.WithTimeout(cfg.Timeout),
 		grpcclient.WithInsecure(cfg.Insecure),
 		grpcclient.WithBearerTokenFile(cfg.TokenFile),
-	)
+	}
+	if !cfg.Insecure {
+		dialOpts = append(dialOpts, grpcclient.WithTLSFiles(cfg.ClientTLS()))
+	}
+	conn, err := grpcclient.Dial(ctx, cfg.Target, dialOpts...)
 	if err != nil {
 		log.Fatal("dial", zap.Error(err))
 	}

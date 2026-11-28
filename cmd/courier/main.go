@@ -25,6 +25,7 @@ import (
 	"github.com/huponx/gocommon/logging"
 	gometrics "github.com/huponx/gocommon/metrics"
 	"github.com/huponx/gocommon/permsync"
+	"github.com/huponx/gocommon/tlsconfig"
 	"github.com/huponx/gocommon/tokenexchange"
 	courierv1 "github.com/huponx/protogen/go/courier/v1"
 	identityv1 "github.com/huponx/protogen/go/identity/v1"
@@ -76,12 +77,21 @@ func main() {
 	renderer := render.New(cfg.DefaultLocale)
 	// the templates edited in the admin app, over the built-in ones; kept current while the process runs
 	go tplsync.Run(ctx, st, renderer, cfg.TemplateReload, log)
-	srv := grpcserver.New(
+	grpcOpts := []grpcserver.Option{
 		grpcserver.WithLogger(log),
 		grpcserver.WithReflection(true),
 		auth.ServerOption(cfg, log, jwtVerifier(cfg, log)),
 		grpcserver.WithMethodPermissions(service.Permissions),
-	)
+	}
+	if st := cfg.ServerTLS(); st.Enabled() {
+		tc, err := tlsconfig.Server(st)
+		if err != nil {
+			log.Fatal("grpc tls", zap.Error(err))
+		}
+		grpcOpts = append(grpcOpts, grpcserver.WithTLS(tc))
+		log.Info("grpc serves TLS", zap.String("cert", st.CertFile))
+	}
+	srv := grpcserver.New(grpcOpts...)
 	notifier := service.New(st, q, renderer, cat, users, cfg.DefaultLocale)
 	courierv1.RegisterCourierServiceServer(srv.GRPC, notifier)
 	var lister service.UserLister
@@ -153,6 +163,9 @@ func identityResolver(ctx context.Context, cfg appconfig.Courier, log *zap.Logge
 		return nil, nil
 	}
 	opts := []grpcclient.Option{grpcclient.WithLogger(log), grpcclient.WithInsecure(cfg.IdentityInsecure)}
+	if !cfg.IdentityInsecure {
+		opts = append(opts, grpcclient.WithTLSFiles(cfg.ClientTLS()))
+	}
 	if cfg.IdentityClientID == "" {
 		log.Warn("no IDENTITY_CLIENT_ID: identity calls carry no token and will be refused (client credentials of the client `courier`)")
 	} else {
